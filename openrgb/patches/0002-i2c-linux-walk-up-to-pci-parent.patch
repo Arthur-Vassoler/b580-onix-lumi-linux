@@ -1,0 +1,40 @@
+--- a/i2c_smbus/Linux/i2c_smbus_linux.cpp
++++ b/i2c_smbus/Linux/i2c_smbus_linux.cpp
+@@ -187,6 +187,37 @@
+                         if(last_slash == NULL || last_slash == path)
+                             continue;
+                         *last_slash = '\0';
++
++                        /*-------------------------------------------------------------*\
++                        | Some GPUs place their i2c adapter behind an intermediate      |
++                        | platform device rather than directly under the PCI device.    |
++                        | Intel Arc resolves to                                         |
++                        |   /sys/devices/pci.../0000:04:00.0/i2c_designware.1024/i2c-15 |
++                        | whose immediate parent carries no PCI identity, leaving the   |
++                        | bus with vendor and device set to zero.  Keep walking up      |
++                        | until a directory holding a 'vendor' file is reached so that  |
++                        | those buses can be matched by PCI ID like any other.          |
++                        \*-------------------------------------------------------------*/
++                        while(true)
++                        {
++                            char probe[PATH_MAX];
++
++                            snprintf(probe, sizeof(probe), "%s/vendor", path);
++
++                            if(access(probe, F_OK) == 0)
++                            {
++                                break;
++                            }
++
++                            char* parent = strrchr(path, '/');
++
++                            if(parent == NULL || parent == path || strcmp(path, "/sys/devices") == 0)
++                            {
++                                break;
++                            }
++
++                            *parent = '\0';
++                        }
+                     }
+                     else
+                     {
