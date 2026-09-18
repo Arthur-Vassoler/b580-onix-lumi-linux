@@ -153,6 +153,13 @@ DESKTOP
 "OpenRGB (ONIX)", while `openrgb` keeps meaning the packaged build. Remove both files to
 undo.
 
+## Synchronising with other devices
+
+The card works with OpenRGB's Effects plugin, which drives everything in Direct mode from a
+single clock so several devices stay genuinely in step. Set the plugin's FPS near 20: this
+driver sleeps 50 ms per transaction, and at higher rates the effect can stall rather than
+just run slower. Details in [`openrgb/README.md`](openrgb/README.md).
+
 ## Safety
 
 **The AMC also controls the card's fans and voltage regulator.** Writing unknown registers

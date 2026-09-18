@@ -101,6 +101,21 @@ Brightness would override whatever the user last chose, and bypass hands the str
 motherboard's ARGB header — a user preference this driver has no business flipping on
 detection.
 
+## Using it with the Effects plugin
+
+Software effects (OpenRGBEffectsPlugin) drive every device in Direct mode from one clock,
+which is the only way to keep several devices genuinely in step - hardware effects each run
+on their own firmware timer and drift apart.
+
+**Set the plugin's FPS to around 20.** This driver sleeps 50 ms after every transaction, so
+the card tops out near 20 updates per second. At the plugin's default the effect can stall
+rather than simply running slower.
+
+Note what the card can and cannot contribute: it holds 14 LEDs but exposes no per-LED
+addressing, so in a wave effect it follows as a single block in whatever colour that moment
+calls for, while devices with addressable LEDs show the gradient travelling across them.
+The colours stay in step; the spatial gradient is not something this card can render.
+
 ## Two hardware constraints, encoded in the driver
 
 1. **Never batch a mode change with other registers in one transaction.** The card accepts
