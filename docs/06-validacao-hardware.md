@@ -73,3 +73,38 @@ Nenhum travamento durante toda a bateria de testes — dezenas de transações, 
 a varredura de 120 cores. A leitura de 1 byte logo após a escrita é segura; o que
 derrubou o barramento antes foi uma leitura de 8 bytes sem nada pendente
 (`docs/03-armadilhas.md`).
+
+## Validação do driver OpenRGB
+
+Compilado contra o master upstream (`0129e58`) com gcc 16.2 e Qt 6.11, em Fedora 44.
+
+```
+$ ./openrgb --list-devices
+0: ONIX LUMI Intel Arc B580
+1: ASUS ROG STRIX B860-G GAMING WIFI
+```
+
+O patch de resolução do barramento faz efeito no log de detecção:
+
+```
+Registering I2C interface: Synopsys DesignWare I2C adapter (/dev/i2c-15) \
+    Device 8086:E20B Subsystem: 207E:A002
+```
+
+Sem ele esse barramento apareceria com vendor e device zerados, e nenhum
+`REGISTER_I2C_PCI_DETECTOR` casaria.
+
+Os oito modos foram exercitados pela linha de comando do OpenRGB e todos responderam:
+Static, Direct, Rainbow, Chroma Flow, Taxiway Glow, Stacking, Breathing e One Color.
+
+### Três defeitos encontrados só ao compilar e rodar
+
+1. **`zone::matrix_map` deixou de ser ponteiro** no OpenRGB atual; atribuir `NULL` não
+   compila.
+2. **O destrutor precisa chamar `Shutdown()`.** Sem isso a classe base reclama em todo
+   encerramento: *"Device thread still active in base class destructor"*.
+3. **Os modos animados subiam congelados.** O driver escrevia modo, brilho e velocidade,
+   mas não o registrador *response* — que é o que põe o efeito em movimento.
+
+Nenhum dos três apareceria numa revisão de código. É a diferença entre escrever um
+driver e ter um driver.

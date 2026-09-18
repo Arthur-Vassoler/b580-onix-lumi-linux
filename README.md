@@ -16,7 +16,8 @@ qualquer outro projeto. O issue upstream do OpenRGB para B580 está aberto e vaz
 | Confirmar que o controlador responde | ✅ feito |
 | Extrair o protocolo do app Windows | ✅ feito — tabela de registradores completa |
 | Validar os comandos no hardware | ✅ feito — LED sob controle no Linux |
-| Driver OpenRGB (C++) | 🚧 em andamento |
+| Driver OpenRGB (C++) | ✅ feito — compilado e validado |
+| Submeter upstream | ⬜ |
 | Submeter upstream | ⬜ |
 
 ## Achado principal
@@ -60,7 +61,15 @@ tools/lumi-led.py off
 A armadilha principal: **nunca agrupe a troca de modo com outros registradores na mesma
 transação** — o comando é aceito e o LED apaga. Uma operação lógica por transação.
 
-Falta o driver em C++ para o OpenRGB.
+O driver do OpenRGB também está pronto, compilado contra o master upstream e validado:
+a placa aparece como `ONIX LUMI Intel Arc B580` e os oito modos funcionam.
+
+```
+$ ./openrgb --list-devices
+0: ONIX LUMI Intel Arc B580
+```
+
+Falta só submeter upstream — ver [`openrgb/README.md`](openrgb/README.md).
 
 ## Aviso
 

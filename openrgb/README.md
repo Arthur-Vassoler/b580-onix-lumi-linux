@@ -86,10 +86,17 @@ nesse caminho, senão o efeito reinicia a cada quadro.
 2. **O brilho precisa ser reaplicado depois de trocar de modo** — um modo acessado
    pela primeira vez sobe apagado.
 
+## Estado
+
+Compilado contra o master upstream (`0129e58`) com gcc 16.2 e Qt 6.11 e validado no
+hardware: a placa aparece como `ONIX LUMI Intel Arc B580` e os oito modos respondem.
+
 ## Ainda não verificado
 
-- Os intervalos úteis dos parâmetros de velocidade. Os registradores são de 8 bits e
-  o driver expõe a faixa inteira, com os padrões do fabricante como ponto de partida.
-- Se `speed` maior significa mais rápido ou mais lento em cada efeito.
+- Os intervalos úteis dos parâmetros. Os registradores são de 8 bits e o driver expõe a
+  faixa inteira, com os padrões do fabricante como ponto de partida. `0x19` foi
+  confirmado como velocidade do Rainbow; os demais não foram caracterizados.
+- O que o registrador *response* de fato faz. Sabe-se apenas que sem ele o efeito não
+  anima, então o driver sempre escreve o padrão do fabricante.
 - O registrador `0x27`, que o utilitário oficial escreve com `0x0E` só na
   inicialização.

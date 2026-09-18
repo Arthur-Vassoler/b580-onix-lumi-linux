@@ -229,10 +229,11 @@ def main():
         txs = [[(0x10, MODES[args.name])]]
         bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
         txs.append([(0x3E, bright)])
-        for pname, (reg, _default) in MODE_PARAMS[args.name].items():
+        # os parametros do efeito sao sempre escritos: sem o "response" o modo
+        # acende mas nao anima (docs/06-validacao-hardware.md)
+        for pname, (reg, default) in MODE_PARAMS[args.name].items():
             val = getattr(args, pname, None)
-            if val is not None:
-                txs.append([(reg, val)])
+            txs.append([(reg, default if val is None else val)])
     elif args.cmd == "raw":
         pairs = []
         for item in args.pairs.replace(",", " ").split():

@@ -41,6 +41,17 @@
 #define ONIX_SPEED_MIN              0x00
 #define ONIX_SPEED_MAX              0xFF
 
+/*---------------------------------------------------------*\
+| Every animated mode carries a "response" register in        |
+| addition to its speed.  It is not optional: with it unset   |
+| the mode lights up but never animates.  The vendor tool's    |
+| defaults are written whenever a mode is selected.           |
+\*---------------------------------------------------------*/
+#define ONIX_RAINBOW_RESPONSE_DEFAULT   0x02
+#define ONIX_RUNWAY_RESPONSE_DEFAULT    0x0A
+#define ONIX_RUNWAY_CHASER_DEFAULT      0x01
+#define ONIX_SERIAL_RESPONSE_DEFAULT    0x02
+
 enum
 {
     ONIX_RGBCONTROLLER_MODE_DIRECT = 0,
@@ -172,6 +183,12 @@ RGBController_OnixArc::RGBController_OnixArc(OnixArcController* controller_ptr)
 
 RGBController_OnixArc::~RGBController_OnixArc()
 {
+    /*-----------------------------------------------------*\
+    | The base class runs a device thread; it has to be      |
+    | stopped here, before the base destructor runs.         |
+    \*-----------------------------------------------------*/
+    Shutdown();
+
     delete controller;
 }
 
@@ -226,19 +243,23 @@ void RGBController_OnixArc::ApplyMode(const mode& active, RGBColor color)
         case ONIX_RGBCONTROLLER_MODE_RAINBOW:
             controller->SetMode(ONIX_MODE_RAINBOW);
             controller->SetBrightness((unsigned char)active.brightness);
+            controller->SetRegister(ONIX_REG_RAINBOW_RESPONSE, ONIX_RAINBOW_RESPONSE_DEFAULT);
             controller->SetRegister(ONIX_REG_RAINBOW_SPEED, (unsigned char)active.speed);
             break;
 
         case ONIX_RGBCONTROLLER_MODE_SERIAL:
             controller->SetMode(ONIX_MODE_SERIAL);
             controller->SetBrightness((unsigned char)active.brightness);
+            controller->SetRegister(ONIX_REG_SERIAL_RESPONSE, ONIX_SERIAL_RESPONSE_DEFAULT);
             controller->SetRegister(ONIX_REG_SERIAL_SPEED, (unsigned char)active.speed);
             break;
 
         case ONIX_RGBCONTROLLER_MODE_RUNWAY:
             controller->SetMode(ONIX_MODE_RUNWAY);
             controller->SetBrightness((unsigned char)active.brightness);
-            controller->SetRegister(ONIX_REG_RUNWAY_RESPONSE, (unsigned char)active.speed);
+            controller->SetRegister(ONIX_REG_RUNWAY_RESPONSE, ONIX_RUNWAY_RESPONSE_DEFAULT);
+            controller->SetRegister(ONIX_REG_RUNWAY_CHASER, ONIX_RUNWAY_CHASER_DEFAULT);
+            controller->SetRegister(ONIX_REG_RUNWAY_INTERVAL, (unsigned char)active.speed);
             break;
 
         case ONIX_RGBCONTROLLER_MODE_ONECOLOR:

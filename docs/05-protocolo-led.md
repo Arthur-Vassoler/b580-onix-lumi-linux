@@ -33,13 +33,13 @@ que o kernel usa no mesmo endereço; o LED usa escrita de registrador direta.
 |---:|---|---|
 | `0x0F` | bypass | 0 = desligado, 1 = ligado |
 | `0x10` | **modo** | ver tabela abaixo |
-| `0x11` | Runway: response | padrão 10 |
+| `0x11` | Runway: **response** | padrão 10 — obrigatório, ver abaixo |
 | `0x12` | Runway: interval | padrão 1 |
-| `0x13` | OneColor: response | padrão 10 |
+| `0x13` | OneColor: **response** | padrão 10 — obrigatório |
 | `0x14` | direção | argumento de `LedDirection` |
-| `0x16` | Serial: response | padrão 2 |
+| `0x16` | Serial: **response** | padrão 2 — obrigatório |
 | `0x17` | Serial: speed | padrão 16 |
-| `0x18` | Rainbow: response | padrão 2 |
+| `0x18` | Rainbow: **response** | padrão 2 — obrigatório |
 | `0x19` | Rainbow: speed | padrão 5 |
 | `0x1A` | Custom: **R** | 0–255 |
 | `0x1B` | Custom: **G** | 0–255 |
@@ -68,6 +68,20 @@ que o kernel usa no mesmo endereço; o LED usa escrita de registrador direta.
 > Cuidado: o enum `LightingMode` do código é a ordem do **combobox da interface**
 > (Rainbow=0, Runway=1, OneColor=2, Seria=3, Customize=4, BreathingLight=5,
 > BlockStacking=6) e **não** coincide com o valor no fio. Só a tabela acima vale.
+
+## O registrador "response" não é opcional
+
+Cada modo animado tem, além da velocidade, um registrador chamado *response* no app
+(`0x11` Runway, `0x13` One Color, `0x16` Serial, `0x18` Rainbow). Medido no hardware:
+**sem ele, o modo acende mas não anima.** Selecionar Rainbow e escrever só modo, brilho
+e velocidade dá um arco-íris congelado; escrever `0x18 = 0x02` põe tudo em movimento.
+
+O que exatamente ele faz continua sem explicação — só que precisa estar escrito. Tanto
+o driver quanto `tools/lumi-led.py` mandam sempre o conjunto completo de parâmetros ao
+trocar de modo, com os padrões do fabricante.
+
+A velocidade, essa sim, foi confirmada: `0x19` muda visivelmente o ritmo do arco-íris
+entre 1 e 40.
 
 ## Sequência de inicialização
 
