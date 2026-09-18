@@ -14,7 +14,9 @@ qualquer outro projeto. O issue upstream do OpenRGB para B580 está aberto e vaz
 |---|---|
 | Mapear barramentos e achar o controlador | ✅ feito |
 | Confirmar que o controlador responde | ✅ feito |
-| Extrair o protocolo do app Windows | 🚧 em andamento |
+| Descobrir o formato dos pacotes | ✅ feito (é MCTP, veio do kernel) |
+| Descoberta MCTP no hardware | 🚧 barramento travado, precisa de reboot |
+| Achar o comando do LED no app Windows | 🚧 em andamento |
 | Validar comandos no hardware | ⬜ |
 | Driver OpenRGB (C++) | ⬜ |
 | Submeter upstream | ⬜ |
@@ -30,7 +32,12 @@ gerenciamento da própria placa:
   └─ 0x28     client "amc", instanciado pelo driver xe, sem driver ligado
 ```
 
-Detalhes em [`docs/01-hardware-survey.md`](docs/01-hardware-survey.md).
+O AMC não tem registradores: ele é um **endpoint MCTP** (DMTF DSP0236) sobre SMBus, com
+mensagens *Vendor Defined – PCI*. O formato exato do pacote está no próprio driver da
+Intel (`drivers/gpu/drm/xe/xe_amc.c`), então essa parte não precisou de adivinhação.
+
+Detalhes em [`docs/01-hardware-survey.md`](docs/01-hardware-survey.md) e
+[`docs/02-protocolo-amc.md`](docs/02-protocolo-amc.md).
 
 ## Aviso
 
@@ -41,8 +48,10 @@ escreve no barramento é explicitamente marcado como tal.
 ## Uso
 
 ```sh
-tools/survey.sh          # coleta o inventário de hardware
-tools/amc-probe.py       # sondagem somente-leitura do AMC
+tools/survey.sh              # inventário de hardware
+tools/amc-mctp.py --self-test  # valida o empacotamento MCTP, não toca no hardware
+tools/amc-mctp.py discover     # descoberta MCTP no AMC (somente leitura)
+sudo tools/recover-bus.sh      # quando o barramento trava
 ```
 
 Ambos rodam sem root: o `systemd-logind` dá ACL de `/dev/i2c-*` ao usuário da sessão local.
