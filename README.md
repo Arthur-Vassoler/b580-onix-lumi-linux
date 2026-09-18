@@ -61,6 +61,10 @@ tools/lumi-led.py off
 A armadilha principal: **nunca agrupe a troca de modo com outros registradores na mesma
 transação** — o comando é aceito e o LED apaga. Uma operação lógica por transação.
 
+A fita tem **14 LEDs**, declarados ao firmware pelo registrador `0x27`. Não há como
+endereçá-los individualmente: procuramos e documentamos o negativo em
+[`docs/05`](docs/05-protocolo-led.md).
+
 O driver do OpenRGB também está pronto, compilado contra o master upstream e validado:
 a placa aparece como `ONIX LUMI Intel Arc B580` e os oito modos funcionam.
 

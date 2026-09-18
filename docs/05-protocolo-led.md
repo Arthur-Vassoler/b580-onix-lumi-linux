@@ -152,3 +152,36 @@ catalogados em `docs/04`).
 - Se existe algum caminho não documentado para endereçar os 14 LEDs individualmente.
   O app do fabricante não tem nenhum, e procurar exigiria escrever em registradores
   desconhecidos de um chip que também controla ventoinha e VRM.
+
+## Endereçamento individual: procurado e não encontrado
+
+A fita tem 14 LEDs físicos e distintos — dá para contá-los a olho nu. Mesmo assim, não
+há caminho conhecido para dar cor a cada um.
+
+**O que foi testado.** Se `0xC9`–`0xCB` (a cor do Breathing) fosse o LED 0 de um buffer,
+os 14 LEDs ocupariam `0xC9`–`0xF2`, que cabe exatamente no espaço livre. Com a fita
+inteira em verde, foram escritos `0xFF` nos canais vermelhos hipotéticos — `0xCC`, `0xCF`,
+`0xD2`, `0xD5`, `0xD8`, `0xDB`, `0xDE`, `0xE1`, `0xE4`, `0xE7`, `0xEA`, `0xED`, `0xF0` —
+em três estágios, com a temperatura vigiada.
+
+**Resultado: nada mudou.** A fita permaneceu verde do começo ao fim, e a temperatura ficou
+estável em 56 °C durante toda a operação. Não existe buffer per-LED nesse arranjo.
+
+**Por que a busca parou aqui.** As evidências convergem para o firmware simplesmente não
+oferecer isso:
+
+- O utilitário da ONIX, único software que existe para esta placa, escreve **uma cor para
+  a fita inteira**. Os 23 chamadores de `WriteReadAsync` estão todos catalogados
+  (`docs/04`) e nenhum escreve mais que isso. Seria estranho o fabricante não usar o
+  recurso mais vendável de uma placa ARGB se ele existisse.
+- O arranjo de registradores mais plausível deu negativo.
+- Uma transferência em bloco exigiria um enquadramento diferente do de pares
+  `(registrador, valor)`, e não há como adivinhar isso sem alguma pista.
+
+Continuar significaria escrever às cegas em ~130 registradores desconhecidos de um chip
+que controla ventoinha e VRM, sem hipótese que oriente a busca. A relação entre risco e
+probabilidade não justifica.
+
+Se alguém quiser retomar, o que falta é uma **fonte de evidência nova** — o firmware do
+AMC, um utilitário da ONIX mais recente, ou documentação do fabricante. Escrita às cegas
+não é caminho.
