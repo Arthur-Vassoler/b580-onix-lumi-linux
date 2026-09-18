@@ -64,8 +64,39 @@ The full register map is in [`docs/05-led-protocol.md`](docs/05-led-protocol.md)
   Verified on Linux 7.2 / Fedora 44.
 - `i2c-tools` for `tools/survey.sh`. Python 3 with no external packages for everything else.
 
-No root needed: `systemd-logind` grants the local session user an ACL on `/dev/i2c-*`.
-Check yours with `getfacl /dev/i2c-15`.
+### Bus permissions
+
+No root needed, but only because a udev rule tags the I²C buses for `uaccess`, which is
+what makes `systemd-logind` grant the local session user an ACL on them. Check yours:
+
+```sh
+getfacl /dev/i2c-15        # should list your user with rw-
+```
+
+On Fedora that rule comes from the **`openrgb-udev-rules`** package, which is separate from
+`openrgb` itself:
+
+```sh
+sudo dnf install openrgb-udev-rules
+```
+
+Most distributions ship the same rules under a similar name. The line that matters is:
+
+```
+KERNEL=="i2c-[0-99]*", TAG+="uaccess"
+```
+
+Worth knowing what that grants: access to **every** I²C bus on the machine, including the
+memory modules' SPD EEPROMs on the motherboard SMBus — not just the GPU's. It is the
+tradeoff OpenRGB makes so it can find devices without root. A rule scoped to this card
+alone is possible (the bus's parent chain carries `ATTRS{vendor}=="0x8086"` and
+`ATTRS{device}=="0xe20b"`), but it has not been tested here, so it is not offered as a
+recipe.
+
+If you remove the OpenRGB package after building this driver, take care: `openrgb` depends
+on `openrgb-udev-rules`, so removing it takes the rules along as an unused dependency, and
+everything here starts needing `sudo` after the next reboot. Existing device nodes keep
+their ACLs until then, which makes the breakage easy to miss.
 
 ## Install
 
