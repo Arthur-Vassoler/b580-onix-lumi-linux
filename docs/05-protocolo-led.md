@@ -16,11 +16,13 @@ WriteReadAsync(byte[] writeBuf, int writeLen, byte[] readBuf, int readLen,
                IoCompleteCallback callback)
 ```
 
-Todos os chamadores passam `readBuf = new byte[1]`. O byte lido é descartado pelo app
-— provavelmente um status/ACK.
+Todos os chamadores passam `readBuf = new byte[1]`. O byte lido é descartado pelo app.
+Medido no hardware: é **eco do último valor escrito**, não um status.
 
 **O payload é uma sequência de pares `(registrador, valor)`.** Vários pares podem ir
-numa única escrita. A inicialização faz exatamente isso, mandando três de uma vez.
+numa única escrita — mas **nunca junto com uma troca de modo**: agrupar `0x10` com cor
+e brilho faz o LED apagar, mesmo com o comando sendo aceito. Confirmado no hardware,
+ver `docs/06-validacao-hardware.md`. A init agrupa três pares, e ali não há troca de modo.
 
 Nada de MCTP aqui. O framing MCTP de `docs/02-protocolo-amc.md` é o canal de *alerta*
 que o kernel usa no mesmo endereço; o LED usa escrita de registrador direta.
@@ -117,5 +119,4 @@ Uma zona única, cor global. `MODE_COLORS_MODE_SPECIFIC` para Static e Breathing
   válidos de cada parâmetro. Os padrões estão acima; os limites dos sliders estão no
   BAML dentro de `.rsrc` e ainda não foram extraídos.
 - O que `0x27 = 0x0E` faz. Aparece só na init, sempre com o mesmo valor.
-- O que o byte lido de volta significa.
 - Quantos LEDs a placa tem, e se algum modo aceita endereçamento individual.

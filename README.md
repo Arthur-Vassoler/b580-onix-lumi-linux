@@ -15,8 +15,8 @@ qualquer outro projeto. O issue upstream do OpenRGB para B580 está aberto e vaz
 | Mapear barramentos e achar o controlador | ✅ feito |
 | Confirmar que o controlador responde | ✅ feito |
 | Extrair o protocolo do app Windows | ✅ feito — tabela de registradores completa |
-| Validar os comandos no hardware | 🚧 barramento travado, precisa de reboot |
-| Driver OpenRGB (C++) | ⬜ |
+| Validar os comandos no hardware | ✅ feito — LED sob controle no Linux |
+| Driver OpenRGB (C++) | 🚧 em andamento |
 | Submeter upstream | ⬜ |
 
 ## Achado principal
@@ -47,23 +47,20 @@ Detalhes em [`docs/01`](docs/01-hardware-survey.md) a [`docs/05`](docs/05-protoc
 
 ## Onde paramos
 
-O protocolo está extraído e as ferramentas prontas, mas **nada foi validado no
-hardware ainda**: uma sondagem malfeita travou o barramento (ver
-[`docs/03-armadilhas.md`](docs/03-armadilhas.md)) e o `0x28` só volta com ciclo de
-energia. Próximo passo, depois de reiniciar:
+**Funciona.** Controle completo do LED a partir do Linux, sem root e sem o software do
+fabricante — validado no hardware em 18/09/2026 (ver
+[`docs/06-validacao-hardware.md`](docs/06-validacao-hardware.md)).
 
 ```sh
-tools/survey.sh                            # confirma que o 0x28 reapareceu
-tools/lumi-led.py --dry-run color ff0000   # revisa os bytes
-tools/lumi-led.py color ff0000             # o teste de verdade
+tools/lumi-led.py color ff0000       # vermelho fixo
+tools/lumi-led.py mode rainbow       # arco-íris
+tools/lumi-led.py off
 ```
 
-Se não acender mas também não der erro de I²C, mande a init antes
-(`tools/lumi-led.py init`) — é o que o app oficial faz.
+A armadilha principal: **nunca agrupe a troca de modo com outros registradores na mesma
+transação** — o comando é aceito e o LED apaga. Uma operação lógica por transação.
 
-O material do fabricante fica em `vendor/` (fora do git). Se sumir, o
-`tools/extract-lumi.py` reconstrói tudo a partir do instalador; o download original
-está documentado em [`docs/04-app-windows.md`](docs/04-app-windows.md).
+Falta o driver em C++ para o OpenRGB.
 
 ## Aviso
 

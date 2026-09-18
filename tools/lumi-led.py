@@ -102,8 +102,22 @@ class Lumi:
         if self.bus:
             self.bus.close()
 
+    def send_many(self, txs, delay=0.05):
+        """Envia cada operação lógica em sua PRÓPRIA transação.
+
+        Isto não é preciosismo: empacotar uma troca de modo junto com cor e brilho
+        faz o LED apagar. O app oficial nunca agrupa — cada método dele escreve um
+        comando só. Ver docs/06-validacao-hardware.md.
+        """
+        out = []
+        for i, pairs in enumerate(txs):
+            if i:
+                time.sleep(delay)
+            out.append(self.send(pairs))
+        return out
+
     def send(self, pairs: list[tuple[int, int]]):
-        """Envia pares (registrador, valor) numa única escrita, como o app faz."""
+        """Escreve uma sequência de pares (registrador, valor) numa transação."""
         payload = bytearray()
         for reg, val in pairs:
             payload += bytes([reg & 0xFF, val & 0xFF])
@@ -146,6 +160,8 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="mostra os bytes, não escreve")
     ap.add_argument("--no-read", action="store_true",
                     help="não lê o byte de status depois da escrita")
+    ap.add_argument("--delay", type=float, default=0.05,
+                    help="pausa entre transações, em segundos (padrão 0.05)")
     ap.add_argument("--force", action="store_true",
                     help="permite registradores fora da lista conhecida")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -184,51 +200,55 @@ def main():
 
     args = ap.parse_args()
 
-    pairs: list[tuple[int, int]] = []
+    # cada elemento de txs é uma transação I2C separada
+    txs: list[list[tuple[int, int]]] = []
     if args.cmd == "init":
-        pairs = [(0x3E, DEFAULT_BRIGHTNESS), (0x0F, 0x00), (0x27, 0x0E)]
+        txs = [[(0x3E, DEFAULT_BRIGHTNESS), (0x0F, 0x00), (0x27, 0x0E)]]
     elif args.cmd == "off":
-        pairs = [(0x3E, 0x00)]
+        txs = [[(0x3E, 0x00)]]
     elif args.cmd == "on":
-        pairs = [(0x3E, args.brightness)]
+        txs = [[(0x3E, args.brightness)]]
     elif args.cmd == "brightness":
-        pairs = [(0x3E, args.value)]
+        txs = [[(0x3E, args.value)]]
     elif args.cmd == "bypass":
-        pairs = [(0x0F, 1 if args.state == "on" else 0)]
+        txs = [[(0x0F, 1 if args.state == "on" else 0)]]
     elif args.cmd == "color":
         r, g, b = args.rgb
-        pairs = [(0x10, MODES["custom"]), (0x1A, r), (0x1B, g), (0x1C, b)]
-        if args.brightness is not None:
-            pairs.append((0x3E, args.brightness))
+        bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
+        # ordem validada no hardware: modo, brilho, cor — cada um por si
+        txs = [[(0x10, MODES["custom"])], [(0x3E, bright)],
+               [(0x1A, r), (0x1B, g), (0x1C, b)]]
     elif args.cmd == "breathing":
         r, g, b = args.rgb
-        pairs = [(0x10, MODES["breathing"]), (0xC9, r), (0xCA, g), (0xCB, b)]
+        bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
+        txs = [[(0x10, MODES["breathing"])], [(0x3E, bright)],
+               [(0xC9, r), (0xCA, g), (0xCB, b)]]
         if args.tempo is not None:
-            pairs.append((0xC8, args.tempo))
-        if args.brightness is not None:
-            pairs.append((0x3E, args.brightness))
+            txs.append([(0xC8, args.tempo)])
     elif args.cmd == "mode":
-        pairs = [(0x10, MODES[args.name])]
+        txs = [[(0x10, MODES[args.name])]]
+        bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
+        txs.append([(0x3E, bright)])
         for pname, (reg, _default) in MODE_PARAMS[args.name].items():
             val = getattr(args, pname, None)
             if val is not None:
-                pairs.append((reg, val))
-        if args.brightness is not None:
-            pairs.append((0x3E, args.brightness))
+                txs.append([(reg, val)])
     elif args.cmd == "raw":
+        pairs = []
         for item in args.pairs.replace(",", " ").split():
             reg, _, val = item.partition(":")
             if not val:
                 raise SystemExit(f"par inválido: {item!r} (use reg:val)")
             pairs.append((int(reg, 16), int(val, 16)))
+        txs = [pairs]
 
-    check_regs(pairs, args.force)
+    check_regs([p for tx in txs for p in tx], args.force)
 
     before = gpu_sensors()
     with Lumi(dry_run=args.dry_run, read_status=not args.no_read) as lumi:
         print(f"AMC: /dev/i2c-{lumi.bus_n} addr 0x{lumi.addr:02x}"
               f"{'  [dry-run]' if args.dry_run else ''}")
-        lumi.send(pairs)
+        lumi.send_many(txs, delay=args.delay)
     if not args.dry_run:
         after = gpu_sensors()
         changed = {k: (before.get(k), after[k]) for k in after
