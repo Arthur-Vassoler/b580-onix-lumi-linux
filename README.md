@@ -94,6 +94,34 @@ qmake6 OpenRGB.pro && make -j$(nproc)
 ./openrgb --list-devices
 ```
 
+Note that this builds a **second** OpenRGB. If your distribution also packages one, that
+package does not contain this driver, and typing `openrgb` or clicking the desktop icon
+will still launch it — the card will not show up there.
+
+To keep both side by side without shadowing the packaged command:
+
+```sh
+mkdir -p ~/.local/bin ~/.local/share/applications
+ln -sf "$PWD/openrgb" ~/.local/bin/openrgb-onix
+
+cat > ~/.local/share/applications/openrgb-onix.desktop <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=OpenRGB (ONIX)
+Comment=OpenRGB build with the ONIX LUMI Intel Arc B580 driver
+Icon=org.openrgb.OpenRGB
+StartupWMClass=openrgb
+TryExec=openrgb-onix
+Exec=openrgb-onix
+Terminal=false
+Categories=Utility;
+DESKTOP
+```
+
+`openrgb-onix` then works from the terminal and appears in the application menu as
+"OpenRGB (ONIX)", while `openrgb` keeps meaning the packaged build. Remove both files to
+undo.
+
 ## Safety
 
 **The AMC also controls the card's fans and voltage regulator.** Writing unknown registers
