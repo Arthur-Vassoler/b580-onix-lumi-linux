@@ -227,6 +227,17 @@ goal is to land it upstream.
 Not submitted yet. The driver and the two patches apply cleanly against OpenRGB master and
 are ready to go; see [`openrgb/README.md`](openrgb/README.md).
 
+## Author
+
+<a href="https://github.com/Arthur-Vassoler">
+  <img src="https://github.com/Arthur-Vassoler.png" width="120" alt="Arthur Vassoler's GitHub avatar">
+</a>
+
+**Arthur Vassoler** — [@Arthur-Vassoler](https://github.com/Arthur-Vassoler)
+
+Reverse engineering of the controller, the OpenRGB driver, the standalone CLI and the
+documentation in this repository.
+
 ## License
 
 GPL-2.0-or-later, matching OpenRGB.
