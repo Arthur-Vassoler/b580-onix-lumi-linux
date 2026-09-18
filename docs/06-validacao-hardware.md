@@ -108,3 +108,46 @@ Static, Direct, Rainbow, Chroma Flow, Taxiway Glow, Stacking, Breathing e One Co
 
 Nenhum dos três apareceria numa revisão de código. É a diferença entre escrever um
 driver e ter um driver.
+
+## Auditoria pós-entrega
+
+Feita depois de dar o projeto por pronto, e que achou coisa.
+
+### Um defeito ativo que eu tinha deixado no repositório
+
+`tools/amc-probe.py` varria `0x00..0xff` com `read_byte_data` **por padrão**. Como o AMC
+espera pares `(registrador, valor)`, isso são 256 escritas pela metade em sequência —
+exatamente o padrão que precedeu o travamento do barramento no início do projeto. Quem
+clonasse o repositório e rodasse a ferramenta podia derrubar a placa e precisar reiniciar.
+
+A varredura agora exige `--sweep` e explica o risco. `tools/amc-mctp.py`, que nunca
+chegou a rodar no hardware e faz uma leitura de 32 bytes, exige
+`AMC_MCTP_EXPERIMENTAL=1`.
+
+### O modo era reescrito a cada atualização de cor
+
+`DeviceUpdateLEDs()` reaplicava o modo inteiro nos modos animados. Como o OpenRGB chama
+`DeviceUpdateMode()` e logo em seguida `DeviceUpdateLEDs()`, cada troca de modo escrevia
+`0x10` duas vezes com ~200 ms de intervalo, reiniciando o efeito. Agora só os
+registradores de cor são tocados; os modos que geram cor no firmware não escrevem nada.
+
+Isso apareceu investigando um congelamento **intermitente** do Rainbow — duas ocorrências
+observadas, nenhuma reproduzível sob demanda. A reescrita dupla do modo é a causa mais
+provável, mas isso não está provado: o que se pode afirmar é que, depois da correção,
+oito trocas de modo consecutivas passaram sem falha.
+
+### Faixa de velocidade
+
+A primeira versão expunha `0x00..0xFF` "porque o registrador é de 8 bits", sem ter
+testado. Medido depois: os valores 1, 2, 3, 5, 8, 12, 16, 24, 31, 32, 40 e 64 mantêm o
+efeito rodando. O driver agora para em 64, que é até onde há evidência.
+
+A diferença perceptível dentro dessa faixa é sutil, e não foi possível dizer se valor
+maior deixa mais rápido ou mais lento. O parâmetro está exposto, mas não caracterizado.
+
+### Confirmado nesta rodada
+
+- **Brilho pelo OpenRGB** (`--brightness 20` contra `255`): diferença clara.
+- **Direct vindo de um modo animado**: entra em Custom corretamente e para a animação.
+  A lacuna que eu suspeitava não existia.
+- **`tools/lumi-led.py` depois de alterado**: Rainbow anima.

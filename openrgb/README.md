@@ -46,14 +46,26 @@ intermediário passa a ser reconhecida.
 
 ## Aplicar e compilar
 
+Dependências no Fedora 44 (o `qt6-linguist` é fácil de esquecer e a build só
+falha nele lá pelo fim, na compilação das traduções):
+
+```sh
+sudo dnf install -y gcc-c++ make qt6-qtbase-devel qt6-linguist \
+                    libusb1-devel hidapi-devel mbedtls-devel
+```
+
 ```sh
 git clone https://gitlab.com/CalcProgrammer1/OpenRGB.git
 cd OpenRGB
-git apply /caminho/para/openrgb/patches/*.patch
+git apply /caminho/para/openrgb/patches/0001-*.patch
+git apply /caminho/para/openrgb/patches/0002-*.patch
 cp -r /caminho/para/openrgb/Controllers/OnixArcController Controllers/
-qmake OpenRGB.pro && make -j$(nproc)
-sudo ./OpenRGB
+qmake6 OpenRGB.pro && make -j$(nproc)
+./openrgb --list-devices
 ```
+
+Não precisa de root: o `systemd-logind` dá ACL de `/dev/i2c-*` ao usuário da
+sessão local.
 
 Os arquivos novos são pegos automaticamente: o `OpenRGB.pro` varre
 `Controllers/*/*.cpp`.
@@ -93,9 +105,13 @@ hardware: a placa aparece como `ONIX LUMI Intel Arc B580` e os oito modos respon
 
 ## Ainda não verificado
 
-- Os intervalos úteis dos parâmetros. Os registradores são de 8 bits e o driver expõe a
-  faixa inteira, com os padrões do fabricante como ponto de partida. `0x19` foi
-  confirmado como velocidade do Rainbow; os demais não foram caracterizados.
+- O que a velocidade faz de fato. Os valores 1 a 64 foram verificados e todos mantêm o
+  efeito rodando, mas a diferença perceptível é sutil e não se sabe se maior é mais
+  rápido ou mais lento. O driver para em 64, que é até onde há evidência.
+- Os parâmetros dos outros modos não foram caracterizados; usam os padrões do fabricante.
+- Um congelamento intermitente do Rainbow foi observado duas vezes antes de
+  `DeviceUpdateLEDs` parar de reescrever o modo. Não foi reproduzido depois, mas também
+  nunca foi reproduzido sob demanda — a causa não está provada.
 - O que o registrador *response* de fato faz. Sabe-se apenas que sem ele o efeito não
   anima, então o driver sempre escreve o padrão do fabricante.
 - O registrador `0x27`, que o utilitário oficial escreve com `0x0E` só na

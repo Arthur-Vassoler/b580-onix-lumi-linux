@@ -10,6 +10,12 @@ O formato dos pacotes vem de `drivers/gpu/drm/xe/xe_amc.c` — ver docs/02-proto
 
 Toda transação é escrita + espera de 20 ms + leitura. Nunca faça uma leitura solta:
 ela trava o barramento até o próximo boot (docs/03-armadilhas.md).
+
+AVISO — NUNCA FOI EXECUTADO NO HARDWARE. O empacotamento confere byte a byte com
+o driver da Intel (--self-test), mas nenhuma das transações abaixo chegou a ser
+enviada de verdade: o caminho do LED acabou sendo outro (docs/05-protocolo-led.md)
+e este código ficou sem uso. `discover` lê 32 bytes de uma vez, que é exatamente o
+padrão que travou o barramento uma vez. Trate como experimento, não como ferramenta.
 """
 from __future__ import annotations
 
@@ -200,6 +206,12 @@ def main():
 
     if args.self_test:
         return self_test()
+
+    if args.action and not os.environ.get("AMC_MCTP_EXPERIMENTAL"):
+        print("Esta ferramenta nunca rodou no hardware e pode travar o barramento\n"
+              "até o próximo ciclo de energia. Se entende o risco:\n"
+              "  AMC_MCTP_EXPERIMENTAL=1 tools/amc-mctp.py " + args.action)
+        return 2
     if not args.action:
         ap.print_help()
         return 2

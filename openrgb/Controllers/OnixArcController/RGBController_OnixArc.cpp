@@ -38,8 +38,14 @@
 | range of each one has not been characterised, so the full  |
 | byte range is exposed.                                     |
 \*---------------------------------------------------------*/
-#define ONIX_SPEED_MIN              0x00
-#define ONIX_SPEED_MAX              0xFF
+/*---------------------------------------------------------*\
+| Values from 1 to 64 were all confirmed to keep the effects  |
+| running.  The range above that was never exercised, so the  |
+| slider stops where the evidence does.  The perceived        |
+| difference across this range is subtle.                     |
+\*---------------------------------------------------------*/
+#define ONIX_SPEED_MIN              0x01
+#define ONIX_SPEED_MAX              0x40
 
 /*---------------------------------------------------------*\
 | Every animated mode carries a "response" register in        |
@@ -280,21 +286,45 @@ void RGBController_OnixArc::DeviceUpdateLEDs()
 {
     const mode& active = modes[active_mode];
 
-    if(active.value == ONIX_RGBCONTROLLER_MODE_DIRECT)
+    /*-----------------------------------------------------*\
+    | Only colour registers are touched here.  Rewriting the |
+    | mode register restarts the hardware effect, and        |
+    | OpenRGB calls this right after DeviceUpdateMode and    |
+    | again on every colour change, so re-applying the whole |
+    | mode would restart the animation constantly.           |
+    \*-----------------------------------------------------*/
+    switch(active.value)
     {
-        /*-------------------------------------------------*\
-        | Direct mode is the hot path: the card is already   |
-        | in Custom mode, so only the colour registers get   |
-        | rewritten.  Touching the mode register here would  |
-        | restart the effect on every frame.                 |
-        \*-------------------------------------------------*/
-        controller->SetCustomColor(RGBGetRValue(colors[0]),
-                                   RGBGetGValue(colors[0]),
-                                   RGBGetBValue(colors[0]));
-    }
-    else
-    {
-        ApplyMode(active, active.colors.size() > 0 ? active.colors[0] : colors[0]);
+        case ONIX_RGBCONTROLLER_MODE_DIRECT:
+            controller->SetCustomColor(RGBGetRValue(colors[0]),
+                                       RGBGetGValue(colors[0]),
+                                       RGBGetBValue(colors[0]));
+            break;
+
+        case ONIX_RGBCONTROLLER_MODE_STATIC:
+            if(active.colors.size() > 0)
+            {
+                controller->SetCustomColor(RGBGetRValue(active.colors[0]),
+                                           RGBGetGValue(active.colors[0]),
+                                           RGBGetBValue(active.colors[0]));
+            }
+            break;
+
+        case ONIX_RGBCONTROLLER_MODE_BREATHING:
+            if(active.colors.size() > 0)
+            {
+                controller->SetBreathingColor(RGBGetRValue(active.colors[0]),
+                                              RGBGetGValue(active.colors[0]),
+                                              RGBGetBValue(active.colors[0]));
+            }
+            break;
+
+        default:
+            /*---------------------------------------------*\
+            | The remaining modes generate their own colours |
+            | in firmware and have nothing to update.        |
+            \*---------------------------------------------*/
+            break;
     }
 }
 

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Sondagem SOMENTE-LEITURA do AMC da Arc B580 Onix Lumi.
+"""Sondagem do AMC da Arc B580 Onix Lumi.
+
+Histórico: esta ferramenta é do início do projeto, de quando o protocolo ainda
+era desconhecido. Para controlar o LED use tools/lumi-led.py. O que sobrou de
+útil aqui é o relatório das capacidades do adaptador.
 
 Não escreve nada no barramento (a única exceção é `--probe-cmd`, que manda um
 comando fornecido pelo usuário e está desligado por padrão).
@@ -60,6 +64,11 @@ def print_map(vals):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--sweep", action="store_true",
+                    help="PERIGO: varre 0x00..0xff. Cada leitura escreve um byte "
+                         "solto, e o AMC espera pares (registrador, valor). "
+                         "256 escritas incompletas seguidas travam o barramento "
+                         "até o próximo ciclo de energia. Ver docs/03-armadilhas.md.")
     ap.add_argument("--blocks", action="store_true",
                     help="tentar também leituras de bloco SMBus")
     ap.add_argument("--raw", type=int, metavar="N", default=0,
@@ -89,21 +98,20 @@ def main():
             except OSError as e:
                 print(f"leitura crua               -> erro {e}")
 
-        print("\nmapa de registradores (SMBus read byte data, 0x00..0xff):\n")
-        vals = dump_registers(bus, addr)
-        print_map(vals)
+        if args.sweep:
+            print("\nmapa de registradores (SMBus read byte data, 0x00..0xff):\n")
+            vals = dump_registers(bus, addr)
+            print_map(vals)
 
-        hist = Counter(v for v in vals.values() if not isinstance(v, str))
-        print("\ndistribuição dos valores:")
-        for v, n in hist.most_common(8):
-            print(f"  0x{v:02x}  {n:3d}x  ({n * 100 // len(vals)}%)")
-
-        odd = {r: v for r, v in vals.items()
-               if not isinstance(v, str) and hist[v] != hist.most_common(1)[0][1]}
-        if odd and len(odd) < 64:
-            print("\nregistradores que fogem do valor dominante:")
-            for r, v in sorted(odd.items()):
-                print(f"  0x{r:02x} = 0x{v:02x}")
+            hist = Counter(v for v in vals.values() if not isinstance(v, str))
+            print("\ndistribuição dos valores:")
+            for v, n in hist.most_common(8):
+                print(f"  0x{v:02x}  {n:3d}x  ({n * 100 // len(vals)}%)")
+        else:
+            print("\nvarredura de registradores não executada (use --sweep).")
+            print("O AMC não tem mapa de registradores legível: ele espera pares")
+            print("(registrador, valor) e a varredura manda escritas pela metade.")
+            print("Ver docs/05-protocolo-led.md para o protocolo de verdade.")
 
         if args.blocks:
             print("\nleituras de bloco SMBus:")
