@@ -26,14 +26,22 @@ enum
 {
     ONIX_REG_BYPASS                 = 0x0F,
     ONIX_REG_MODE                   = 0x10,
-    ONIX_REG_RUNWAY_RESPONSE        = 0x11,
+    /*-----------------------------------------------------*\
+    | The vendor's names for these two are misleading. What   |
+    | it calls "response" is the animation rate, and what it   |
+    | calls "speed" is spatial: how tightly the colour cycle   |
+    | is packed across the strip. Measured on hardware for     |
+    | Rainbow; the others follow by analogy and are marked.    |
+    | See docs/07-effect-parameters.md.                        |
+    \*-----------------------------------------------------*/
+    ONIX_REG_RUNWAY_SPEED           = 0x11,   /* vendor: "response", inferred */
     ONIX_REG_RUNWAY_INTERVAL        = 0x12,
-    ONIX_REG_ONECOLOR_RESPONSE      = 0x13,
+    ONIX_REG_ONECOLOR_SPEED         = 0x13,   /* vendor: "response", inferred */
     ONIX_REG_DIRECTION              = 0x14,
-    ONIX_REG_SERIAL_RESPONSE        = 0x16,
-    ONIX_REG_SERIAL_SPEED           = 0x17,
-    ONIX_REG_RAINBOW_RESPONSE       = 0x18,
-    ONIX_REG_RAINBOW_SPEED          = 0x19,
+    ONIX_REG_SERIAL_SPEED           = 0x16,   /* vendor: "response", inferred */
+    ONIX_REG_SERIAL_DENSITY         = 0x17,   /* vendor: "speed", inferred      */
+    ONIX_REG_RAINBOW_SPEED          = 0x18,   /* vendor: "response", measured   */
+    ONIX_REG_RAINBOW_DENSITY        = 0x19,   /* vendor: "speed", measured      */
     ONIX_REG_CUSTOM_RED             = 0x1A,
     ONIX_REG_CUSTOM_GREEN           = 0x1B,
     ONIX_REG_CUSTOM_BLUE            = 0x1C,

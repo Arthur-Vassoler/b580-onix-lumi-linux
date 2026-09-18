@@ -30,11 +30,11 @@ from amc import I2CBus, find_amc  # noqa: E402
 REGS = {
     0x0F: "bypass",
     0x10: "mode",
-    0x11: "runway.response", 0x12: "runway.interval", 0x29: "runway.chaser",
-    0x13: "onecolor.response",
+    0x11: "runway.speed", 0x12: "runway.interval", 0x29: "runway.chaser",
+    0x13: "onecolor.speed",
     0x14: "direction",
-    0x16: "serial.response", 0x17: "serial.speed",
-    0x18: "rainbow.response", 0x19: "rainbow.speed",
+    0x16: "serial.speed", 0x17: "serial.density",
+    0x18: "rainbow.speed", 0x19: "rainbow.density",
     0x1A: "custom.R", 0x1B: "custom.G", 0x1C: "custom.B",
     0x20: "stacking.speed",
     0x27: "strip.length",
@@ -49,12 +49,17 @@ MODES = {
 }
 
 # per-mode parameters: argument name -> (register, factory default)
+#
+# "speed" is the animation rate and "density" is how tightly the colour cycle is
+# packed across the strip. The vendor's software calls them "response" and
+# "speed" respectively, which is backwards from what they do - measured on
+# hardware for Rainbow, inferred for the rest. See docs/07-effect-parameters.md.
 MODE_PARAMS = {
-    "rainbow":  {"response": (0x18, 2),  "speed": (0x19, 5)},
-    "runway":   {"response": (0x11, 10), "interval": (0x12, 1),
+    "rainbow":  {"speed": (0x18, 2),  "density": (0x19, 5)},
+    "runway":   {"speed": (0x11, 10), "interval": (0x12, 1),
                  "chaser": (0x29, 1)},
-    "onecolor": {"response": (0x13, 10)},
-    "serial":   {"response": (0x16, 2),  "speed": (0x17, 16)},
+    "onecolor": {"speed": (0x13, 10)},
+    "serial":   {"speed": (0x16, 2),  "density": (0x17, 16)},
     "stacking": {"speed": (0x20, 10)},
     "breathing": {"tempo": (0xC8, 6)},
     "custom":   {},
@@ -237,8 +242,9 @@ def main():
 
     p = sub.add_parser("mode", help="select an effect mode")
     p.add_argument("name", choices=sorted(MODES))
-    p.add_argument("--speed", type=int)
-    p.add_argument("--response", type=int)
+    p.add_argument("--speed", type=int, help="animation rate")
+    p.add_argument("--density", type=int,
+                   help="how tightly the colour cycle packs across the strip")
     p.add_argument("--interval", type=int)
     p.add_argument("--chaser", type=int)
     p.add_argument("--tempo", type=int)

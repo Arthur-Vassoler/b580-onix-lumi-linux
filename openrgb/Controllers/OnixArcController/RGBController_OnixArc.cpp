@@ -39,13 +39,13 @@
 | byte range is exposed.                                     |
 \*---------------------------------------------------------*/
 /*---------------------------------------------------------*\
-| Values from 1 to 64 were all confirmed to keep the effects  |
-| running.  The range above that was never exercised, so the  |
-| slider stops where the evidence does.  The perceived        |
-| difference across this range is subtle.                     |
+| Speed is the animation rate, and raising it visibly speeds   |
+| the effect up.  Values 1, 2, 4 and 10 were measured and are  |
+| monotonic; anything above that has not been characterised,   |
+| so the slider stops where the evidence does.                 |
 \*---------------------------------------------------------*/
 #define ONIX_SPEED_MIN              0x01
-#define ONIX_SPEED_MAX              0x40
+#define ONIX_SPEED_MAX              0x0A
 
 /*---------------------------------------------------------*\
 | Every animated mode carries a "response" register in        |
@@ -53,10 +53,10 @@
 | the mode lights up but never animates.  The vendor tool's    |
 | defaults are written whenever a mode is selected.           |
 \*---------------------------------------------------------*/
-#define ONIX_RAINBOW_RESPONSE_DEFAULT   0x02
-#define ONIX_RUNWAY_RESPONSE_DEFAULT    0x0A
+#define ONIX_RAINBOW_DENSITY_DEFAULT    0x05
+#define ONIX_SERIAL_DENSITY_DEFAULT     0x10
+#define ONIX_RUNWAY_INTERVAL_DEFAULT    0x01
 #define ONIX_RUNWAY_CHASER_DEFAULT      0x01
-#define ONIX_SERIAL_RESPONSE_DEFAULT    0x02
 
 enum
 {
@@ -141,7 +141,7 @@ RGBController_OnixArc::RGBController_OnixArc(OnixArcController* controller_ptr)
     Serial.color_mode           = MODE_COLORS_NONE;
     Serial.speed_min            = ONIX_SPEED_MIN;
     Serial.speed_max            = ONIX_SPEED_MAX;
-    Serial.speed                = 16;
+    Serial.speed                = 2;
     Serial.brightness_min       = 0;
     Serial.brightness_max       = 0xFF;
     Serial.brightness           = ONIX_BRIGHTNESS_DEFAULT;
@@ -254,29 +254,29 @@ void RGBController_OnixArc::ApplyMode(const mode& active, RGBColor color)
         case ONIX_RGBCONTROLLER_MODE_RAINBOW:
             controller->SetMode(ONIX_MODE_RAINBOW);
             controller->SetBrightness((unsigned char)active.brightness);
-            controller->SetRegister(ONIX_REG_RAINBOW_RESPONSE, ONIX_RAINBOW_RESPONSE_DEFAULT);
+            controller->SetRegister(ONIX_REG_RAINBOW_DENSITY, ONIX_RAINBOW_DENSITY_DEFAULT);
             controller->SetRegister(ONIX_REG_RAINBOW_SPEED, (unsigned char)active.speed);
             break;
 
         case ONIX_RGBCONTROLLER_MODE_SERIAL:
             controller->SetMode(ONIX_MODE_SERIAL);
             controller->SetBrightness((unsigned char)active.brightness);
-            controller->SetRegister(ONIX_REG_SERIAL_RESPONSE, ONIX_SERIAL_RESPONSE_DEFAULT);
+            controller->SetRegister(ONIX_REG_SERIAL_DENSITY, ONIX_SERIAL_DENSITY_DEFAULT);
             controller->SetRegister(ONIX_REG_SERIAL_SPEED, (unsigned char)active.speed);
             break;
 
         case ONIX_RGBCONTROLLER_MODE_RUNWAY:
             controller->SetMode(ONIX_MODE_RUNWAY);
             controller->SetBrightness((unsigned char)active.brightness);
-            controller->SetRegister(ONIX_REG_RUNWAY_RESPONSE, ONIX_RUNWAY_RESPONSE_DEFAULT);
+            controller->SetRegister(ONIX_REG_RUNWAY_INTERVAL, ONIX_RUNWAY_INTERVAL_DEFAULT);
             controller->SetRegister(ONIX_REG_RUNWAY_CHASER, ONIX_RUNWAY_CHASER_DEFAULT);
-            controller->SetRegister(ONIX_REG_RUNWAY_INTERVAL, (unsigned char)active.speed);
+            controller->SetRegister(ONIX_REG_RUNWAY_SPEED, (unsigned char)active.speed);
             break;
 
         case ONIX_RGBCONTROLLER_MODE_ONECOLOR:
             controller->SetMode(ONIX_MODE_ONECOLOR);
             controller->SetBrightness((unsigned char)active.brightness);
-            controller->SetRegister(ONIX_REG_ONECOLOR_RESPONSE, (unsigned char)active.speed);
+            controller->SetRegister(ONIX_REG_ONECOLOR_SPEED, (unsigned char)active.speed);
             break;
 
         case ONIX_RGBCONTROLLER_MODE_BLOCK_STACKING:

@@ -35,14 +35,14 @@ kernel uses at the same address; the LED uses plain register writes.
 |---:|---|---|
 | `0x0F` | bypass | 0 = off, 1 = on |
 | `0x10` | **mode** | see table below |
-| `0x11` | Runway: **response** | default 10 — required, see below |
+| `0x11` | Runway: **speed** | default 10 — vendor calls it "response" |
 | `0x12` | Runway: interval | default 1 |
-| `0x13` | OneColor: **response** | default 10 — required |
+| `0x13` | OneColor: **speed** | default 10 — vendor calls it "response" |
 | `0x14` | direction | argument of `LedDirection` |
-| `0x16` | Serial: **response** | default 2 — required |
-| `0x17` | Serial: speed | default 16 |
-| `0x18` | Rainbow: **response** | default 2 — required |
-| `0x19` | Rainbow: speed | default 5 |
+| `0x16` | Serial: **speed** | default 2 — vendor calls it "response" |
+| `0x17` | Serial: density | default 16 — vendor calls it "speed" |
+| `0x18` | Rainbow: **speed** | default 2 — vendor calls it "response" |
+| `0x19` | Rainbow: density | default 5 — vendor calls it "speed" |
 | `0x1A` | Custom: **R** | 0–255 |
 | `0x1B` | Custom: **G** | 0–255 |
 | `0x1C` | Custom: **B** | 0–255 |
@@ -72,18 +72,30 @@ kernel uses at the same address; the LED uses plain register writes.
 > BlockStacking=6) and does **not** match the value on the wire. Only the table above
 > applies.
 
-## The "response" register is not optional
+## The vendor's names for the two effect parameters are backwards
 
-Every animated mode has, besides its speed, a register the app calls *response* (`0x11`
-Runway, `0x13` One Color, `0x16` Serial, `0x18` Rainbow). Measured on hardware: **without
-it the mode lights up but does not animate.** Selecting Rainbow and writing only mode,
-brightness and speed gives a frozen rainbow; writing `0x18 = 0x02` sets it moving.
+Every animated mode carries two registers. The vendor application calls them *response* and
+*speed*, and this document repeated those names for a long time. Measured on hardware for
+Rainbow, they do the opposite of what the names suggest:
 
-What it actually does remains unexplained — only that it has to be written. Both the driver
-and `tools/lumi-led.py` always send a mode's full parameter set on a mode change, using the
-vendor defaults.
+| register | vendor name | what it actually does |
+|---|---|---|
+| `0x18` | "response" | **animation rate** — 1, 2, 4, 10 get monotonically faster |
+| `0x19` | "speed" | **gradient density** — higher packs the colour cycle tighter |
 
-Speed, on the other hand, is confirmed: `0x19` visibly changes the rainbow's pace.
+Which is why `0x18` looked like an on/off switch at first: at its lowest the effect barely
+moves, so a mode entered without it reads as frozen. And why `0x19` looked like speed: a
+denser gradient pushes more colours past any given LED in the same time, so a purely
+spatial change reads as faster.
+
+The two were separated by measuring them independently — counting colour bands across the
+14 LEDs for the spatial axis, and timing a full cycle for the temporal one. Varying `0x19`
+changed the band count with the cycle time unchanged; varying `0x18` did the reverse.
+Protocol in `docs/07-effect-parameters.md`.
+
+**Only Rainbow was measured.** Serial (`0x16`/`0x17`), Runway (`0x11`/`0x12`) and One Color
+(`0x13`) share the vendor's naming pattern, so the same reading is applied to them, but
+marked as inferred in the code and still to be confirmed.
 
 ## Initialisation sequence
 

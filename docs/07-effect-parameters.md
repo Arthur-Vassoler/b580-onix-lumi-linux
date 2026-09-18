@@ -1,6 +1,6 @@
 # 07 — Characterising the effect parameters
 
-Status: **open**. This document is a protocol to run, not a result.
+Status: **Rainbow resolved**; the other modes still to be measured.
 
 ## The question
 
@@ -104,6 +104,32 @@ If Rainbow splits cleanly, the same protocol should be run for those before assu
 result carries over. Block Stacking (`0x20`) and Breathing (`0xC8`) have a single parameter
 each, so there is nothing to separate.
 
-## Results
+## Results — Rainbow, 2026-09-18
 
-Fill in as the steps are run. Record the date and anything that made a reading uncertain.
+**`0x18` is the animation rate.** Values 1, 2, 4 and 10 each visibly faster than the last,
+monotonic across the whole series.
+
+**`0x19` is gradient density.** Lowering it to 2 made the gradient markedly wider; raising
+it packs the colour cycle tighter. Crucially, **the cycle time did not change** while `0x19`
+varied, which is what rules out the optical illusion that a denser gradient creates.
+
+That is the clean split the protocol was designed to find: one register changes the spatial
+reading and not the temporal one, and the other does the reverse.
+
+### Caveats on these readings
+
+An OpenRGB GUI instance was open during the runs, holding `/dev/i2c-15`. Its device thread
+can write to the card, so it was competing with the probe. The qualitative conclusions are
+taken as sound because the changes were consistent and repeated across four consecutive
+steps, which a sporadic interfering write would not produce — but they were not measured
+under exclusive access.
+
+The upper end of the rate is **not** established. A range test covering 1 to 255 was run
+while that GUI was still open and is therefore discarded. The driver's slider stops at 10,
+the highest value actually observed to be monotonic.
+
+### Still to do
+
+- Re-run the range test with exclusive access to set the slider maximum on evidence.
+- Run this protocol for Serial (`0x16`/`0x17`) and Runway (`0x11`/`0x12`). The driver
+  currently applies Rainbow's reading to them by analogy.
