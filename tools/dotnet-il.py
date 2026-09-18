@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lista e desmonta métodos de um assembly .NET.
+"""List and disassemble the methods of a .NET assembly.
 
     tools/dotnet-il.py LUMI.exe --list
     tools/dotnet-il.py LUMI.exe --dump 'SetLed.*Mode'
@@ -15,9 +15,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotnet_meta import Assembly  # noqa: E402
 
-# opcode -> (nome, tipo do operando)
-#   '' nenhum | 'i1','u1','i2','i4','i8','r4','r8' imediato
-#   'T' token | 'br1','br4' desvio | 'sw' switch | 'var1','var2' variável
+# opcode -> (name, operand kind)
+#   '' none | 'i1','u1','i2','i4','i8','r4','r8' immediate
+#   'T' token | 'br1','br4' branch | 'sw' switch | 'var1','var2' variable
 OPS = {
     0x00: ("nop", ""), 0x01: ("break", ""),
     0x02: ("ldarg.0", ""), 0x03: ("ldarg.1", ""), 0x04: ("ldarg.2", ""),
@@ -143,13 +143,13 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("assembly")
-    ap.add_argument("--list", action="store_true", help="lista os métodos")
-    ap.add_argument("--dump", metavar="REGEX", help="desmonta os métodos que casam")
-    ap.add_argument("--type", metavar="REGEX", help="restringe ao tipo")
+    ap.add_argument("--list", action="store_true", help="list the methods")
+    ap.add_argument("--dump", metavar="REGEX", help="disassemble matching methods")
+    ap.add_argument("--type", metavar="REGEX", help="restrict to matching types")
     args = ap.parse_args()
 
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from peinfo import PE  # noqa: E402  (fica ao lado, no scratchpad ou no repo)
+    from peinfo import PE  # noqa: E402  (sits next to this file)
 
     asm = Assembly(PE(args.assembly))
     tre = re.compile(args.type, re.I) if args.type else None
@@ -161,7 +161,7 @@ def main():
             print(f"{typ}::{name}  rva=0x{rva:x}")
         if args.dump and re.search(args.dump, name, re.I):
             il, _ = asm.method_body(rva)
-            print(f"\n=== {typ}::{name}  ({len(il)} bytes de IL) ===")
+            print(f"\n=== {typ}::{name}  ({len(il)} bytes of IL) ===")
             print("\n".join(disasm(asm, il)))
     return 0
 

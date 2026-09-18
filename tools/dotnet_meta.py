@@ -1,18 +1,18 @@
-"""Leitor mínimo de metadados ECMA-335 e desmontador de IL.
+"""Minimal ECMA-335 metadata reader.
 
-Escrito porque o `monodis` do Fedora aborta neste assembly (assertion no heap de
-strings) e instalar o dotnet-sdk só para rodar o ILSpy seria desproporcional.
-Cobre o suficiente para responder à pergunta do projeto: quais bytes o app monta
-antes de chamar WriteReadAsync.
+Written because Fedora's `monodis` aborts on this assembly (an assertion in the
+string heap), and installing the dotnet SDK just to run ILSpy would have been out
+of proportion. It covers enough to answer the project's question: which bytes the
+application builds before calling WriteReadAsync.
 
-Sem dependências externas.
+No external dependencies.
 """
 from __future__ import annotations
 
 import struct
 
-# tabela -> lista de colunas. Tipos: 'u8','u16','u32', 'S' string, 'G' guid,
-# 'B' blob, ('T', tabela) índice simples, ('C', nome) índice codificado.
+# table -> list of columns. Types: 'u8','u16','u32', 'S' string, 'G' guid,
+# 'B' blob, ('T', table) simple index, ('C', name) coded index.
 TABLES = {
     0x00: ("Module", [("Generation", "u16"), ("Name", "S"), ("Mvid", "G"),
                       ("EncId", "G"), ("EncBaseId", "G")]),
@@ -85,7 +85,7 @@ TABLES = {
                                       ("Constraint", ("C", "TypeDefOrRef"))]),
 }
 
-# índice codificado -> (bits de tag, tabelas na ordem das tags)
+# coded index -> (tag bits, tables in tag order)
 CODED = {
     "TypeDefOrRef": (2, [0x02, 0x01, 0x1B]),
     "HasConstant": (2, [0x04, 0x08, 0x17]),
@@ -111,7 +111,7 @@ class Assembly:
         b = pe.b
         rva, _ = pe.dir(14)
         if not rva:
-            raise ValueError("não é um assembly .NET")
+            raise ValueError("not a .NET assembly")
         o = pe.r2o(rva)
         md_rva, md_sz = struct.unpack_from("<II", b, o + 8)
         self.md = pe.r2o(md_rva)
@@ -146,11 +146,11 @@ class Assembly:
         for i in present:
             self.counts[i] = struct.unpack_from("<I", b, q)[0]
             q += 4
-        # tamanhos de coluna dependem das contagens, então resolve agora
+        # column widths depend on the row counts, so resolve them now
         self.rows = {}
         for i in present:
             if i not in TABLES:
-                raise ValueError(f"tabela desconhecida 0x{i:02x}")
+                raise ValueError(f"unknown table 0x{i:02x}")
             name, cols = TABLES[i]
             widths = [self._col_size(c) for _, c in cols]
             self.rows[i] = (name, cols, widths, sum(widths), q)
@@ -174,7 +174,7 @@ class Assembly:
     # -- acesso ------------------------------------------------------------
 
     def row(self, table, idx):
-        """Linha 1-based da tabela, como dict."""
+        """One 1-based row of the table, as a dict."""
         name, cols, widths, rowsz, base = self.rows[table]
         o = base + (idx - 1) * rowsz
         out = {}
@@ -218,10 +218,10 @@ class Assembly:
             n = ((n & 0x1F) << 24) | (b[o+1] << 16) | (b[o+2] << 8) | b[o+3]; o += 4
         return b[o:o + n - 1].decode("utf-16-le", "replace")
 
-    # -- conveniências -----------------------------------------------------
+    # -- conveniences ------------------------------------------------------
 
     def type_of_method(self, method_idx):
-        """Nome do tipo que contém o MethodDef (1-based)."""
+        """Name of the type containing the MethodDef (1-based)."""
         best = None
         for i in range(1, self.count(0x02) + 1):
             td = self.row(0x02, i)
@@ -240,7 +240,7 @@ class Assembly:
             yield i, self.type_of_method(i), self.string(m["Name"]), m["RVA"]
 
     def token_name(self, token):
-        """Nome legível para um token de metadados (MethodDef/MemberRef/Field/...)."""
+        """Readable name for a metadata token (MethodDef/MemberRef/Field/...)."""
         tbl, idx = token >> 24, token & 0xFFFFFF
         if idx == 0: return f"token:0x{token:08x}"
         try:
@@ -268,7 +268,7 @@ class Assembly:
         return f"token:0x{token:08x}"
 
     def method_body(self, rva):
-        """(bytes de IL, tamanho_max_pilha) a partir do RVA do método."""
+        """(IL bytes, max stack) for the method at the given RVA."""
         if not rva: return b"", 0
         o = self.pe.r2o(rva)
         if o is None or o >= len(self.pe.b):

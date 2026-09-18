@@ -1,3 +1,10 @@
+"""Minimal PE reader: sections, exports and imports.
+
+Written for inspecting the vendor's Windows binaries without pulling in pefile.
+Used by tools/dotnet-il.py, and usable on its own:
+
+    tools/peinfo.py some.dll
+"""
 import struct, sys
 
 class PE:
@@ -72,9 +79,9 @@ if __name__ == '__main__':
     p = PE(sys.argv[1])
     dll, exps = p.exports()
     print(f"== {sys.argv[1]} ==")
-    print("seções:", ", ".join(f"{n}(0x{va:x},{vs}b)" for n, va, vs, rp, rs in p.secs))
+    print("sections:", ", ".join(f"{n}(0x{va:x},{vs}b)" for n, va, vs, rp, rs in p.secs))
     if exports := exps:
-        print(f"\nexports de {dll} ({len(exports)}):")
+        print(f"\nexports from {dll} ({len(exports)}):")
         for nm, ordn, fr in exports:
             print(f"  {nm:<32} ord={ordn:<4} rva=0x{fr:x}")
     print("\nimports:")

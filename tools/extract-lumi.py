@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Extrai os binários de dentro do instalador LUMI ARGB da ONIX.
+"""Extract the binaries from inside ONIX's LUMI ARGB installer.
 
-O instalador é Inno Setup 6.3, que o innoextract 1.9 (o do Fedora) não abre e o
-7-Zip não reconhece. Mas não é preciso interpretar os cabeçalhos do Inno: os
-arquivos estão num único stream LZMA1 sólido, marcado por `zlb\\x1a` seguido das
-5 propriedades. Descomprime o stream e recorta os PEs pelo cabeçalho.
+The installer is Inno Setup 6.3, which innoextract 1.9 (the version Fedora ships)
+will not open and 7-Zip does not recognise. There is no need to parse Inno's
+headers though: the files sit in a single solid LZMA1 stream, marked by
+`zlb\\x1a` followed by the 5 property bytes. Decompress the stream and carve the
+PE files on their headers.
 
     tools/extract-lumi.py LUMISetupV2.1.exe -o /destino
 
-O instalador vem de https://cdn.onixsys.com/assets/downloads/LUMISetupV2.1.zip
-(página oficial: https://onixsys.com/download-en/). Não é redistribuído aqui.
+The installer comes from https://cdn.onixsys.com/assets/downloads/LUMISetupV2.1.zip
+(official page: https://onixsys.com/download-en/). It is not redistributed here.
 """
 from __future__ import annotations
 
@@ -23,19 +24,19 @@ import sys
 def decompress(installer: bytes) -> bytes:
     off = installer.find(b"zlb\x1a")
     if off < 0:
-        raise SystemExit("assinatura 'zlb' não encontrada — instalador diferente?")
+        raise SystemExit("no 'zlb' signature found - a different installer?")
     props = installer[off + 4:off + 9]
-    # LZMA1 sem campo de tamanho; FORMAT_ALONE quer 13 bytes de cabeçalho
+    # LZMA1 with no size field; FORMAT_ALONE wants a 13 byte header
     header = props + (0xFFFFFFFFFFFFFFFF).to_bytes(8, "little")
     dec = lzma.LZMADecompressor(format=lzma.FORMAT_ALONE)
     try:
         return dec.decompress(header + installer[off + 9:])
     except lzma.LZMAError as exc:
-        raise SystemExit(f"falha ao descomprimir: {exc}")
+        raise SystemExit(f"decompression failed: {exc}")
 
 
 def pe_disk_size(blob: bytes, off: int):
-    """Tamanho em disco de um PE em `off`, ou None se não for um PE válido."""
+    """On-disk size of the PE at `off`, or None if it is not a valid PE."""
     if blob[off:off + 2] != b"MZ" or off + 0x40 > len(blob):
         return None
     lfanew = struct.unpack_from("<I", blob, off + 0x3C)[0]
@@ -55,7 +56,7 @@ def pe_disk_size(blob: bytes, off: int):
 
 
 def pdb_name(pe: bytes) -> str | None:
-    """Nome do arquivo a partir do caminho do PDB no CodeView (RSDS)."""
+    """File name taken from the PDB path in the CodeView (RSDS) record."""
     i = pe.find(b"RSDS")
     if i < 0:
         return None
@@ -69,14 +70,14 @@ def pdb_name(pe: bytes) -> str | None:
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("installer", help="LUMISetupV2.1.exe (descompactado do .zip)")
-    ap.add_argument("-o", "--out", default="lumi-extracted", help="diretório de saída")
+    ap.add_argument("installer", help="LUMISetupV2.1.exe, unpacked from the .zip")
+    ap.add_argument("-o", "--out", default="lumi-extracted", help="output directory")
     ap.add_argument("--keep-payload", action="store_true",
-                    help="grava também o blob descomprimido inteiro")
+                    help="also write out the whole decompressed blob")
     args = ap.parse_args()
 
     blob = decompress(open(args.installer, "rb").read())
-    print(f"payload descomprimido: {len(blob) / 1048576:.1f} MiB")
+    print(f"decompressed payload: {len(blob) / 1048576:.1f} MiB")
 
     os.makedirs(args.out, exist_ok=True)
     if args.keep_payload:
@@ -92,7 +93,7 @@ def main():
         size = pe_disk_size(blob, i)
         if size:
             name = pdb_name(blob[i:i + size]) or f"unknown_{i:08x}"
-            # PEs distintos podem compartilhar nome de PDB (ex.: DriverInstall)
+            # distinct PEs can share a PDB name (DriverInstall, for instance)
             stem, dot, ext = name.rpartition(".")
             n, cand = 1, name
             while cand in used:
@@ -103,7 +104,7 @@ def main():
             print(f"  0x{i:08x}  {size:>9}b  {cand}")
             found += 1
         i += 2
-    print(f"\n{found} executáveis extraídos em {args.out}/")
+    print(f"\n{found} executables extracted into {args.out}/")
     return 0
 
 

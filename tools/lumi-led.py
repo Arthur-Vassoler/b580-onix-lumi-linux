@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Controla o LED ARGB da Intel Arc B580 Onix Lumi no Linux.
+"""Control the ARGB lighting of an Intel Arc B580 Onix Lumi on Linux.
 
-Fala com o AMC em /dev/i2c-15, endereço 0x28, usando o mesmo protocolo do
-utilitário oficial da ONIX — pares (registrador, valor). Ver docs/05-led-protocol.md.
+Talks to the AMC on /dev/i2c-15, address 0x28, using the same protocol as ONIX's
+own utility - (register, value) pairs. See docs/05-led-protocol.md.
 
-    tools/lumi-led.py init                    # sequência de inicialização do app
-    tools/lumi-led.py color ff0000            # modo Custom, vermelho
+    tools/lumi-led.py init                    # the app's init sequence
+    tools/lumi-led.py color ff0000            # Custom mode, red
     tools/lumi-led.py brightness 136
     tools/lumi-led.py mode rainbow --speed 5
     tools/lumi-led.py off
-    tools/lumi-led.py raw 3e:88 --dry-run     # mostra sem escrever
+    tools/lumi-led.py raw 3e:88 --dry-run     # show the bytes without writing
 
-Não precisa de root: o systemd-logind dá ACL de /dev/i2c-* ao usuário da sessão local.
+No root needed: systemd-logind grants the local session user an ACL on /dev/i2c-*.
 """
 from __future__ import annotations
 
@@ -24,21 +24,21 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from amc import I2CBus, find_amc  # noqa: E402
 
-# registrador -> rótulo. Só estes são escritos sem --force: são os que o app da
-# ONIX usa. O AMC também controla ventoinha e VRM; registradores fora desta lista
-# não foram observados e podem não ser de iluminação.
+# register -> label. Only these are written without --force: they are the ones
+# ONIX's app uses. The AMC also drives the fans and the voltage regulator, and
+# registers outside this list were never observed and may not be lighting at all.
 REGS = {
     0x0F: "bypass",
-    0x10: "modo",
+    0x10: "mode",
     0x11: "runway.response", 0x12: "runway.interval", 0x29: "runway.chaser",
     0x13: "onecolor.response",
-    0x14: "direcao",
+    0x14: "direction",
     0x16: "serial.response", 0x17: "serial.speed",
     0x18: "rainbow.response", 0x19: "rainbow.speed",
     0x1A: "custom.R", 0x1B: "custom.G", 0x1C: "custom.B",
     0x20: "stacking.speed",
-    0x27: "comprimento.fita",
-    0x3E: "brilho",
+    0x27: "strip.length",
+    0x3E: "brightness",
     0xC8: "breathing.tempo",
     0xC9: "breathing.R", 0xCA: "breathing.G", 0xCB: "breathing.B",
 }
@@ -48,7 +48,7 @@ MODES = {
     "runway": 0x04, "onecolor": 0x05, "stacking": 0x06,
 }
 
-# parâmetros por modo: nome do argumento -> (registrador, padrão de fábrica)
+# per-mode parameters: argument name -> (register, factory default)
 MODE_PARAMS = {
     "rainbow":  {"response": (0x18, 2),  "speed": (0x19, 5)},
     "runway":   {"response": (0x11, 10), "interval": (0x12, 1),
@@ -103,11 +103,11 @@ class Lumi:
             self.bus.close()
 
     def send_many(self, txs, delay=0.05):
-        """Envia cada operação lógica em sua PRÓPRIA transação.
+        """Send each logical operation in its OWN transaction.
 
-        Isto não é preciosismo: empacotar uma troca de modo junto com cor e brilho
-        faz o LED apagar. O app oficial nunca agrupa — cada método dele escreve um
-        comando só. Ver docs/06-hardware-validation.md.
+        This is not fussiness: batching a mode change together with colour and
+        brightness turns the lighting off. The official app never batches - each
+        of its methods writes a single command. See docs/06-hardware-validation.md.
         """
         out = []
         for i, pairs in enumerate(txs):
@@ -117,7 +117,7 @@ class Lumi:
         return out
 
     def send(self, pairs: list[tuple[int, int]]):
-        """Escreve uma sequência de pares (registrador, valor) numa transação."""
+        """Write a sequence of (register, value) pairs in one transaction."""
         payload = bytearray()
         for reg, val in pairs:
             payload += bytes([reg & 0xFF, val & 0xFF])
@@ -130,8 +130,8 @@ class Lumi:
         if not self.read_status:
             return None
         time.sleep(0.005)
-        # leitura logo após a escrita: é o que o app da ONIX faz. Leitura solta,
-        # sem escrita antes, trava o barramento — ver docs/03-pitfalls.md.
+        # reading right after the write is what ONIX's app does. A bare read,
+        # with no write before it, wedges the bus - see docs/03-pitfalls.md.
         status = self.bus.raw_read(self.addr, 1, i_know_the_risk=True)
         if self.verbose:
             print(f"  <- {status.hex()}")
@@ -141,7 +141,7 @@ class Lumi:
 def parse_color(s: str) -> tuple[int, int, int]:
     s = s.lstrip("#")
     if len(s) != 6:
-        raise argparse.ArgumentTypeError("cor deve ser RRGGBB em hex")
+        raise argparse.ArgumentTypeError("colour must be RRGGBB in hex")
     return int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16)
 
 
@@ -149,41 +149,42 @@ def check_regs(pairs, force):
     unknown = [r for r, _ in pairs if r not in REGS]
     if unknown and not force:
         raise SystemExit(
-            "registrador(es) fora da lista conhecida: "
+            "register(s) outside the known list: "
             + ", ".join(f"0x{r:02x}" for r in unknown)
-            + "\nO AMC também controla ventoinha e VRM. Use --force se tem certeza.")
+            + "\nThe AMC also drives the fans and the voltage regulator. "
+              "Use --force if you are sure.")
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--dry-run", action="store_true", help="mostra os bytes, não escreve")
+    ap.add_argument("--dry-run", action="store_true", help="show the bytes, do not write")
     ap.add_argument("--no-read", action="store_true",
-                    help="não lê o byte de status depois da escrita")
+                    help="do not read the status byte after writing")
     ap.add_argument("--delay", type=float, default=0.05,
-                    help="pausa entre transações, em segundos (padrão 0.05)")
+                    help="pause between transactions, in seconds (default 0.05)")
     ap.add_argument("--force", action="store_true",
-                    help="permite registradores fora da lista conhecida")
+                    help="allow registers outside the known list")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("init", help="sequência de inicialização do app oficial")
-    sub.add_parser("off", help="brilho 0")
-    p = sub.add_parser("on", help="brilho padrão (0x88)")
+    sub.add_parser("init", help="the official app\'s init sequence")
+    sub.add_parser("off", help="brightness 0")
+    p = sub.add_parser("on", help="default brightness (0x88)")
     p.add_argument("--brightness", type=int, default=DEFAULT_BRIGHTNESS)
 
-    p = sub.add_parser("brightness", help="define o brilho")
+    p = sub.add_parser("brightness", help="set the brightness")
     p.add_argument("value", type=int)
 
-    p = sub.add_parser("color", help="modo Custom com cor fixa")
+    p = sub.add_parser("color", help="Custom mode with a fixed colour")
     p.add_argument("rgb", type=parse_color, metavar="RRGGBB")
     p.add_argument("--brightness", type=int)
 
-    p = sub.add_parser("breathing", help="modo Breathing com cor")
+    p = sub.add_parser("breathing", help="Breathing mode with a colour")
     p.add_argument("rgb", type=parse_color, metavar="RRGGBB")
     p.add_argument("--tempo", type=int)
     p.add_argument("--brightness", type=int)
 
-    p = sub.add_parser("mode", help="seleciona um modo de efeito")
+    p = sub.add_parser("mode", help="select an effect mode")
     p.add_argument("name", choices=sorted(MODES))
     p.add_argument("--speed", type=int)
     p.add_argument("--response", type=int)
@@ -192,15 +193,15 @@ def main():
     p.add_argument("--tempo", type=int)
     p.add_argument("--brightness", type=int)
 
-    p = sub.add_parser("bypass", help="liga/desliga o bypass")
+    p = sub.add_parser("bypass", help="turn bypass on or off")
     p.add_argument("state", choices=["on", "off"])
 
-    p = sub.add_parser("raw", help="pares reg:val crus, ex: 3e:88,10:01")
+    p = sub.add_parser("raw", help="raw reg:val pairs, e.g. 3e:88,10:01")
     p.add_argument("pairs")
 
     args = ap.parse_args()
 
-    # cada elemento de txs é uma transação I2C separada
+    # each element of txs is a separate I2C transaction
     txs: list[list[tuple[int, int]]] = []
     if args.cmd == "init":
         txs = [[(0x3E, DEFAULT_BRIGHTNESS), (0x0F, 0x00), (0x27, 0x0E)]]
@@ -215,7 +216,7 @@ def main():
     elif args.cmd == "color":
         r, g, b = args.rgb
         bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
-        # ordem validada no hardware: modo, brilho, cor — cada um por si
+        # order validated on hardware: mode, brightness, colour - each on its own
         txs = [[(0x10, MODES["custom"])], [(0x3E, bright)],
                [(0x1A, r), (0x1B, g), (0x1C, b)]]
     elif args.cmd == "breathing":
@@ -229,8 +230,8 @@ def main():
         txs = [[(0x10, MODES[args.name])]]
         bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
         txs.append([(0x3E, bright)])
-        # os parametros do efeito sao sempre escritos: sem o "response" o modo
-        # acende mas nao anima (docs/06-hardware-validation.md)
+        # effect parameters are always written: without "response" the mode
+        # lights up but never animates (docs/06-hardware-validation.md)
         for pname, (reg, default) in MODE_PARAMS[args.name].items():
             val = getattr(args, pname, None)
             txs.append([(reg, default if val is None else val)])
@@ -239,7 +240,7 @@ def main():
         for item in args.pairs.replace(",", " ").split():
             reg, _, val = item.partition(":")
             if not val:
-                raise SystemExit(f"par inválido: {item!r} (use reg:val)")
+                raise SystemExit(f"invalid pair: {item!r} (use reg:val)")
             pairs.append((int(reg, 16), int(val, 16)))
         txs = [pairs]
 
@@ -255,7 +256,7 @@ def main():
         changed = {k: (before.get(k), after[k]) for k in after
                    if before.get(k) != after[k]}
         if changed:
-            print("sensores da GPU:", ", ".join(
+            print("GPU sensors:", ", ".join(
                 f"{k} {a}->{b}" for k, (a, b) in changed.items()))
     return 0
 

@@ -1,15 +1,15 @@
 """
-Acesso de baixo nível ao AMC (Add-in card Management Controller) da Arc B580.
+Low level access to the Arc B580's AMC (Add-in card Management Controller).
 
-Sem dependências externas — fala com /dev/i2c-N direto pelos ioctls do i2c-dev.
+No external dependencies — talks to /dev/i2c-N through the i2c-dev ioctls.
 
     from amc import I2CBus, find_amc
     bus, addr = find_amc()
     with I2CBus(bus) as b:
         print(hex(b.read_byte(addr)))
 
-Tudo aqui é leitura por padrão. Os métodos de escrita existem, mas quem chama
-precisa saber o que está fazendo: o AMC também controla ventoinha e VRM.
+Everything here reads by default. The write methods exist, but the caller has to
+know what they are doing: the AMC also drives the fans and the voltage regulator.
 """
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import fcntl
 import glob
 import os
 
-# ioctls do i2c-dev (uapi/linux/i2c-dev.h)
+# i2c-dev ioctls (uapi/linux/i2c-dev.h)
 I2C_SLAVE = 0x0703
 I2C_SLAVE_FORCE = 0x0706
 I2C_FUNCS = 0x0705
@@ -60,7 +60,7 @@ I2C_FUNC_BITS = [
 class i2c_smbus_data(ctypes.Union):
     _fields_ = [("byte", ctypes.c_uint8),
                 ("word", ctypes.c_uint16),
-                ("block", ctypes.c_uint8 * 34)]  # len + 32 dados + pad
+                ("block", ctypes.c_uint8 * 34)]  # length + 32 data bytes + pad
 
 
 class i2c_smbus_ioctl_data(ctypes.Structure):
@@ -83,9 +83,9 @@ class i2c_rdwr_ioctl_data(ctypes.Structure):
 
 
 def find_amc():
-    """Localiza o barramento e o endereço do client 'amc' instanciado pelo xe.
+    """Locate the bus and address of the 'amc' client the xe driver instantiates.
 
-    Retorna (bus_number, addr) ou levanta RuntimeError.
+    Returns (bus_number, addr), or raises RuntimeError.
     """
     for dev in glob.glob("/sys/bus/i2c/devices/*-[0-9a-f]*"):
         name_path = os.path.join(dev, "name")
@@ -97,14 +97,14 @@ def find_amc():
                     continue
         except OSError:
             continue
-        base = os.path.basename(dev)          # ex: "15-0028"
+        base = os.path.basename(dev)          # e.g. "15-0028"
         bus_s, _, addr_s = base.partition("-")
         return int(bus_s), int(addr_s, 16)
-    raise RuntimeError("client i2c 'amc' não encontrado — a GPU está com o driver xe?")
+    raise RuntimeError("no 'amc' i2c client found - is the GPU bound to the xe driver?")
 
 
 class I2CBus:
-    """Wrapper fino sobre /dev/i2c-N."""
+    """Thin wrapper around /dev/i2c-N."""
 
     def __init__(self, bus: int):
         self.bus = bus
@@ -123,7 +123,7 @@ class I2CBus:
             os.close(self.fd)
             self.fd = None
 
-    # -- infraestrutura -------------------------------------------------
+    # -- plumbing -------------------------------------------------------
 
     def funcs(self) -> int:
         val = ctypes.c_ulong()
@@ -147,10 +147,10 @@ class I2CBus:
         fcntl.ioctl(self.fd, I2C_SMBUS, args)
         return buf
 
-    # -- leituras -------------------------------------------------------
+    # -- reads ----------------------------------------------------------
 
     def read_byte(self, addr: int) -> int:
-        """SMBus Receive Byte: só endereça e lê um byte."""
+        """SMBus Receive Byte: addresses the device and reads one byte."""
         return self._smbus(addr, I2C_SMBUS_READ, 0, I2C_SMBUS_BYTE).byte
 
     def read_byte_data(self, addr: int, reg: int) -> int:
@@ -160,32 +160,32 @@ class I2CBus:
         return self._smbus(addr, I2C_SMBUS_READ, reg, I2C_SMBUS_WORD_DATA).word
 
     def read_block_data(self, addr: int, reg: int) -> bytes:
-        """SMBus Read Block: o dispositivo informa o tamanho."""
+        """SMBus Read Block: the device declares the length."""
         d = self._smbus(addr, I2C_SMBUS_READ, reg, I2C_SMBUS_BLOCK_DATA)
         n = min(d.block[0], 32)
         return bytes(d.block[1:1 + n])
 
     def read_i2c_block(self, addr: int, reg: int, length: int) -> bytes:
-        """I2C block read: o host dita o tamanho (até 32)."""
+        """I2C block read: the host dictates the length (up to 32)."""
         d = i2c_smbus_data()
         d.block[0] = length
         d = self._smbus(addr, I2C_SMBUS_READ, reg, I2C_SMBUS_I2C_BLOCK_DATA, d)
         return bytes(d.block[1:1 + length])
 
     def raw_read(self, addr: int, length: int, i_know_the_risk: bool = False) -> bytes:
-        """Leitura I2C crua (sem byte de comando).
+        """Raw I2C read, with no command byte.
 
-        PERIGO — comprovadamente trava o AMC desta placa. Um read solto, sem o
-        byte de comando que ele espera, deixa o dispositivo fora de sincronia
-        segurando SDA; o barramento inteiro para de responder e só volta com
-        ciclo de energia. Ver docs/03-pitfalls.md.
+        DANGER - this is known to wedge this card's AMC. A bare read, without
+        the request the device expects, leaves it out of sync holding SDA low;
+        the whole bus stops responding and only a power cycle brings it back.
+        See docs/03-pitfalls.md.
 
-        Mantido apenas para documentar o comportamento. Exige opt-in explícito.
+        Kept purely to document the behaviour. Requires an explicit opt-in.
         """
         if not i_know_the_risk:
             raise RuntimeError(
-                "raw_read() trava o AMC da Arc B580 e exige reboot para voltar. "
-                "Use write_then_read(). Se realmente quiser, passe "
+                "raw_read() wedges the Arc B580's AMC and needs a reboot to "
+                "recover. Use write_then_read(). If you really mean it, pass "
                 "i_know_the_risk=True.")
         buf = (ctypes.c_uint8 * length)()
         msg = i2c_msg(addr=addr, flags=I2C_M_RD, len=length, buf=buf)
@@ -193,10 +193,10 @@ class I2CBus:
         return bytes(buf)
 
     def write_then_read(self, addr: int, out: bytes, length: int) -> bytes:
-        """Escreve `out`, faz repeated-start, lê `length` bytes.
+        """Write `out`, issue a repeated start, read `length` bytes.
 
-        É o padrão de request/response da maioria dos MCUs. ATENÇÃO: isto
-        escreve no barramento.
+        The request/response pattern most MCUs use. NOTE: this writes to the
+        bus.
         """
         wbuf = (ctypes.c_uint8 * len(out))(*out)
         rbuf = (ctypes.c_uint8 * length)()
@@ -205,7 +205,7 @@ class I2CBus:
         self._xfer(msgs)
         return bytes(rbuf)
 
-    # -- escritas (perigoso; ver README) --------------------------------
+    # -- writes (dangerous; see README) ---------------------------------
 
     def write_byte(self, addr: int, value: int):
         d = i2c_smbus_data()
@@ -219,7 +219,7 @@ class I2CBus:
 
     def write_block_data(self, addr: int, reg: int, payload: bytes):
         if len(payload) > 32:
-            raise ValueError("bloco SMBus é limitado a 32 bytes")
+            raise ValueError("an SMBus block is limited to 32 bytes")
         d = i2c_smbus_data()
         d.block[0] = len(payload)
         for i, b in enumerate(payload):

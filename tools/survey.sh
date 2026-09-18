@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Inventário de hardware relevante para o LED da Arc B580 Onix Lumi.
-# Somente leitura. Não precisa de root.
+# Inventory of the hardware relevant to the Arc B580 Onix Lumi's lighting.
+# Read only. No root required.
 set -uo pipefail
 
 hdr() { printf '\n\033[1m=== %s ===\033[0m\n' "$*"; }
 
-hdr "Sistema"
+hdr "System"
 uname -a; grep '^PRETTY_NAME' /etc/os-release
 
 hdr "GPU"
@@ -14,36 +14,36 @@ GPU=$(lspci -D -nn | grep -Ei 'vga|display' | grep -i intel | head -1 | cut -d' 
 echo "PCI: $GPU"
 [ -n "${GPU:-}" ] && echo "driver: $(basename "$(readlink -f /sys/bus/pci/devices/$GPU/driver 2>/dev/null)")"
 
-hdr "Dispositivos USB (LED via USB?)"
+hdr "USB devices (is the lighting on USB?)"
 lsusb
 
-hdr "Barramentos I2C"
+hdr "I2C buses"
 for d in /sys/class/i2c-dev/i2c-*; do
     n=$(basename "$d")
     printf '%-8s %-38s %s\n' "$n" "$(cat "$d/name" 2>/dev/null)" \
         "$(readlink -f "$d/device" 2>/dev/null | sed 's|/sys/devices||')"
 done | sort -V
 
-hdr "Barramentos I2C pertencentes à GPU"
+hdr "I2C buses belonging to the GPU"
 [ -n "${GPU:-}" ] && ls -d /sys/bus/pci/devices/$GPU/i2c-* /sys/bus/pci/devices/$GPU/i2c_designware.*/i2c-* 2>/dev/null
 
-hdr "Clients I2C já instanciados pelo kernel"
+hdr "I2C clients already instantiated by the kernel"
 for c in /sys/bus/i2c/devices/*-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]; do
     [ -e "$c" ] || continue
-    drv=$([ -L "$c/driver" ] && basename "$(readlink "$c/driver")" || echo '(nenhum)')
+    drv=$([ -L "$c/driver" ] && basename "$(readlink "$c/driver")" || echo '(none)')
     printf '%-12s name=%-12s driver=%s\n' "$(basename "$c")" "$(cat "$c/name" 2>/dev/null)" "$drv"
 done
 
-hdr "Varredura dos barramentos (modo leitura, seguro)"
+hdr "Bus scan (read mode, safe)"
 for d in /sys/class/i2c-dev/i2c-*; do
     n=$(basename "$d"); b=${n#i2c-}
     name=$(cat "$d/name" 2>/dev/null)
     out=$(i2cdetect -y -r "$b" 2>/dev/null | tail -n +2)
     found=$(echo "$out" | grep -oE ' (UU|[0-9a-f]{2})' | tr -d ' ' | grep -v '^--$' | tr '\n' ' ')
-    printf '%-8s %-38s %s\n' "$n" "$name" "${found:-(vazio)}"
+    printf '%-8s %-38s %s\n' "$n" "$name" "${found:-(empty)}"
 done
 
-hdr "hwmon da GPU (para monitorar fan/temp durante testes de escrita)"
+hdr "GPU hwmon (to watch fans and temperatures during write tests)"
 for h in /sys/class/hwmon/hwmon*; do
     [ "$(cat "$h/name" 2>/dev/null)" = "xe" ] || continue
     echo "$h"
