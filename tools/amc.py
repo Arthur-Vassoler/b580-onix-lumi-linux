@@ -178,7 +178,7 @@ class I2CBus:
         PERIGO — comprovadamente trava o AMC desta placa. Um read solto, sem o
         byte de comando que ele espera, deixa o dispositivo fora de sincronia
         segurando SDA; o barramento inteiro para de responder e só volta com
-        ciclo de energia. Ver docs/03-armadilhas.md.
+        ciclo de energia. Ver docs/03-pitfalls.md.
 
         Mantido apenas para documentar o comportamento. Exige opt-in explícito.
         """

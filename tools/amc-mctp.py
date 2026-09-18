@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fala MCTP sobre SMBus com o AMC da Arc B580.
 
-O formato dos pacotes vem de `drivers/gpu/drm/xe/xe_amc.c` — ver docs/02-protocolo-amc.md.
+O formato dos pacotes vem de `drivers/gpu/drm/xe/xe_amc.c` — ver docs/02-amc-protocol.md.
 
     tools/amc-mctp.py --self-test        # valida o empacotamento, não toca no hardware
     tools/amc-mctp.py discover           # descoberta MCTP padrão, somente leitura
@@ -9,11 +9,11 @@ O formato dos pacotes vem de `drivers/gpu/drm/xe/xe_amc.c` — ver docs/02-proto
     tools/amc-mctp.py raw 7e:8086:01     # mensagem vendor-defined arbitrária
 
 Toda transação é escrita + espera de 20 ms + leitura. Nunca faça uma leitura solta:
-ela trava o barramento até o próximo boot (docs/03-armadilhas.md).
+ela trava o barramento até o próximo boot (docs/03-pitfalls.md).
 
 AVISO — NUNCA FOI EXECUTADO NO HARDWARE. O empacotamento confere byte a byte com
 o driver da Intel (--self-test), mas nenhuma das transações abaixo chegou a ser
-enviada de verdade: o caminho do LED acabou sendo outro (docs/05-protocolo-led.md)
+enviada de verdade: o caminho do LED acabou sendo outro (docs/05-led-protocol.md)
 e este código ficou sem uso. `discover` lê 32 bytes de uma vez, que é exatamente o
 padrão que travou o barramento uma vez. Trate como experimento, não como ferramenta.
 """

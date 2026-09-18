@@ -1,53 +1,53 @@
-# Driver OpenRGB para a ONIX LUMI Intel Arc B580
+# OpenRGB driver for the ONIX LUMI Intel Arc B580
 
-Suporte à iluminação da placa no OpenRGB. O protocolo está documentado em
-[`../docs/05-protocolo-led.md`](../docs/05-protocolo-led.md) e foi validado no
-hardware ([`../docs/06`](../docs/06-validacao-hardware.md)).
+Lighting support for the card in OpenRGB. The protocol is documented in
+[`../docs/05-led-protocol.md`](../docs/05-led-protocol.md) and was validated on hardware
+([`../docs/06`](../docs/06-hardware-validation.md)).
 
-## Arquivos
+## Files
 
 ```
 Controllers/OnixArcController/
-    OnixArcController.h            mapa de registradores e modos
-    OnixArcController.cpp          transações I2C
+    OnixArcController.h            register map and mode constants
+    OnixArcController.cpp          I2C transactions
     RGBController_OnixArc.h
-    RGBController_OnixArc.cpp      zonas, modos e efeitos
-    OnixArcControllerDetect.cpp    detecção por ID PCI
+    RGBController_OnixArc.cpp      zones, modes and effects
+    OnixArcControllerDetect.cpp    detection by PCI ID
 
 patches/
     0001-pci_ids-add-onix-arc-b580.patch
     0002-i2c-linux-walk-up-to-pci-parent.patch
 ```
 
-## Por que os dois patches
+## Why the two patches
 
-**`0001`** só acrescenta identificadores: `INTEL_ARC_B580_DEV` (`0xE20B`),
-`ONIX_SUB_VEN` (`0x207E`) e `ONIX_LUMI_ARC_B580` (`0xA002`).
+**`0001`** only adds identifiers: `INTEL_ARC_B580_DEV` (`0xE20B`), `ONIX_SUB_VEN`
+(`0x207E`) and `ONIX_LUMI_ARC_B580` (`0xA002`).
 
-**`0002`** é um conserto de verdade, e vale para além desta placa. O OpenRGB resolve o
-caminho real do adaptador I²C e trunca **uma vez** para chegar ao dispositivo PCI pai.
-Isso funciona para GPUs AMD, onde o adaptador é filho direto do device PCI:
+**`0002`** is a real fix, and it matters beyond this card. OpenRGB resolves the I²C
+adapter's real path and truncates it **once** to reach the parent PCI device. That works
+for AMD GPUs, where the adapter is a direct child of the PCI device:
 
 ```
 /sys/devices/pci.../0000:03:00.0/i2c-4        ->  0000:03:00.0   ✔
 ```
 
-Na Arc, o adaptador fica atrás de um device de plataforma intermediário:
+On Arc, the adapter sits behind an intermediate platform device:
 
 ```
 /sys/devices/pci.../0000:04:00.0/i2c_designware.1024/i2c-15
-                                 ^^^^^^^^^^^^^^^^^^^ para aqui, sem vendor/device
+                                 ^^^^^^^^^^^^^^^^^^^ stops here, no vendor/device
 ```
 
-O barramento acaba registrado com vendor e device zerados, e nenhum
-`REGISTER_I2C_PCI_DETECTOR` casa. O patch continua subindo até achar um diretório com
-o arquivo `vendor`. É genérico: qualquer GPU que exponha o I²C por um device
-intermediário passa a ser reconhecida.
+The bus ends up registered with vendor and device zeroed, and no
+`REGISTER_I2C_PCI_DETECTOR` matches. The patch keeps walking up until it reaches a
+directory holding a `vendor` file. It is generic: any GPU that exposes I²C through an
+intermediate device becomes detectable.
 
-## Aplicar e compilar
+## Building
 
-Dependências no Fedora 44 (o `qt6-linguist` é fácil de esquecer e a build só
-falha nele lá pelo fim, na compilação das traduções):
+Dependencies on Fedora 44 — `qt6-linguist` is easy to forget, and the build only fails on
+it near the end, while compiling translations:
 
 ```sh
 sudo dnf install -y gcc-c++ make qt6-qtbase-devel qt6-linguist \
@@ -57,62 +57,58 @@ sudo dnf install -y gcc-c++ make qt6-qtbase-devel qt6-linguist \
 ```sh
 git clone https://gitlab.com/CalcProgrammer1/OpenRGB.git
 cd OpenRGB
-git apply /caminho/para/openrgb/patches/0001-*.patch
-git apply /caminho/para/openrgb/patches/0002-*.patch
-cp -r /caminho/para/openrgb/Controllers/OnixArcController Controllers/
+git apply /path/to/openrgb/patches/0001-*.patch
+git apply /path/to/openrgb/patches/0002-*.patch
+cp -r /path/to/openrgb/Controllers/OnixArcController Controllers/
 qmake6 OpenRGB.pro && make -j$(nproc)
 ./openrgb --list-devices
 ```
 
-Não precisa de root: o `systemd-logind` dá ACL de `/dev/i2c-*` ao usuário da
-sessão local.
+No root needed: `systemd-logind` grants the local session user an ACL on `/dev/i2c-*`.
 
-Os arquivos novos são pegos automaticamente: o `OpenRGB.pro` varre
-`Controllers/*/*.cpp`.
+The new files are picked up automatically — `OpenRGB.pro` globs `Controllers/*/*.cpp`.
 
-## O que o driver expõe
+## What the driver exposes
 
-Uma zona, um LED — a placa gera todos os efeitos em firmware e não oferece
-endereçamento individual.
+One zone, one LED. The strip holds 14 LEDs, but the card generates every effect in
+firmware and offers no individual addressing, so a single LED is the honest representation
+rather than 14 that always match.
 
-| modo OpenRGB | registrador `0x10` | cores |
+| OpenRGB mode | register `0x10` | colours |
 |---|---|---|
-| Direct | `0x01` | por LED |
-| Static | `0x01` | específica do modo |
-| Breathing | `0x02` | específica do modo |
-| Rainbow | `0x00` | nenhuma |
-| Chroma Flow | `0x03` | nenhuma |
-| Taxiway Glow | `0x04` | nenhuma |
-| One Color | `0x05` | nenhuma |
-| Stacking | `0x06` | nenhuma |
+| Direct | `0x01` | per LED |
+| Static | `0x01` | mode specific |
+| Breathing | `0x02` | mode specific |
+| Rainbow | `0x00` | none |
+| Chroma Flow | `0x03` | none |
+| Taxiway Glow | `0x04` | none |
+| One Color | `0x05` | none |
+| Stacking | `0x06` | none |
 
-**Direct** funciona porque, uma vez no modo Custom, basta reescrever os registradores
-de cor — medido a 20 Hz sem erro de I²C. O driver evita tocar no registrador de modo
-nesse caminho, senão o efeito reinicia a cada quadro.
+**Direct** works because, once Custom mode is active, it is enough to rewrite the colour
+registers — measured at 20 Hz with no I²C errors. The driver avoids touching the mode
+register on that path, otherwise the effect restarts on every frame.
 
-## Duas restrições do hardware, gravadas no código
+## Two hardware constraints, encoded in the driver
 
-1. **Nunca agrupe a troca de modo com outros registradores na mesma transação.** A
-   placa aceita o pacote e apaga. Uma operação lógica por transação, com 50 ms entre
-   elas.
-2. **O brilho precisa ser reaplicado depois de trocar de modo** — um modo acessado
-   pela primeira vez sobe apagado.
+1. **Never batch a mode change with other registers in one transaction.** The card accepts
+   the packet and goes dark. One logical operation per transaction, 50 ms apart.
+2. **Brightness has to be reapplied after a mode change** — a mode entered for the first
+   time comes up dark.
 
-## Estado
+## Status
 
-Compilado contra o master upstream (`0129e58`) com gcc 16.2 e Qt 6.11 e validado no
-hardware: a placa aparece como `ONIX LUMI Intel Arc B580` e os oito modos respondem.
+Built against upstream master (`0129e58`) with gcc 16.2 and Qt 6.11, and validated on
+hardware: the card appears as `ONIX LUMI Intel Arc B580` and all eight modes respond.
 
-## Ainda não verificado
+Not submitted upstream yet. Both patches apply cleanly to master.
 
-- O que a velocidade faz de fato. Os valores 1 a 64 foram verificados e todos mantêm o
-  efeito rodando, mas a diferença perceptível é sutil e não se sabe se maior é mais
-  rápido ou mais lento. O driver para em 64, que é até onde há evidência.
-- Os parâmetros dos outros modos não foram caracterizados; usam os padrões do fabricante.
-- Um congelamento intermitente do Rainbow foi observado duas vezes antes de
-  `DeviceUpdateLEDs` parar de reescrever o modo. Não foi reproduzido depois, mas também
-  nunca foi reproduzido sob demanda — a causa não está provada.
-- O que o registrador *response* de fato faz. Sabe-se apenas que sem ele o efeito não
-  anima, então o driver sempre escreve o padrão do fabricante.
-- O registrador `0x27`, que o utilitário oficial escreve com `0x0E` só na
-  inicialização.
+## Not yet verified
+
+- What speed actually does. Values 1 through 64 were checked and all keep the effect
+  running, but the perceptible difference is subtle and it is unclear whether higher means
+  faster or slower. The driver stops at 64, which is as far as the evidence goes.
+- The other modes' parameters were not characterised; they use the vendor defaults.
+- An intermittent Rainbow freeze was observed twice before `DeviceUpdateLEDs` stopped
+  rewriting the mode. It has not recurred since, but it was never reproducible on demand
+  either — the cause is not proven.

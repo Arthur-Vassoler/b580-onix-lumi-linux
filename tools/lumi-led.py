@@ -2,7 +2,7 @@
 """Controla o LED ARGB da Intel Arc B580 Onix Lumi no Linux.
 
 Fala com o AMC em /dev/i2c-15, endereço 0x28, usando o mesmo protocolo do
-utilitário oficial da ONIX — pares (registrador, valor). Ver docs/05-protocolo-led.md.
+utilitário oficial da ONIX — pares (registrador, valor). Ver docs/05-led-protocol.md.
 
     tools/lumi-led.py init                    # sequência de inicialização do app
     tools/lumi-led.py color ff0000            # modo Custom, vermelho
@@ -107,7 +107,7 @@ class Lumi:
 
         Isto não é preciosismo: empacotar uma troca de modo junto com cor e brilho
         faz o LED apagar. O app oficial nunca agrupa — cada método dele escreve um
-        comando só. Ver docs/06-validacao-hardware.md.
+        comando só. Ver docs/06-hardware-validation.md.
         """
         out = []
         for i, pairs in enumerate(txs):
@@ -131,7 +131,7 @@ class Lumi:
             return None
         time.sleep(0.005)
         # leitura logo após a escrita: é o que o app da ONIX faz. Leitura solta,
-        # sem escrita antes, trava o barramento — ver docs/03-armadilhas.md.
+        # sem escrita antes, trava o barramento — ver docs/03-pitfalls.md.
         status = self.bus.raw_read(self.addr, 1, i_know_the_risk=True)
         if self.verbose:
             print(f"  <- {status.hex()}")
@@ -230,7 +230,7 @@ def main():
         bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
         txs.append([(0x3E, bright)])
         # os parametros do efeito sao sempre escritos: sem o "response" o modo
-        # acende mas nao anima (docs/06-validacao-hardware.md)
+        # acende mas nao anima (docs/06-hardware-validation.md)
         for pname, (reg, default) in MODE_PARAMS[args.name].items():
             val = getattr(args, pname, None)
             txs.append([(reg, default if val is None else val)])

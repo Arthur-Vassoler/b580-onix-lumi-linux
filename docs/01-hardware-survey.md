@@ -1,8 +1,8 @@
-# 01 — Levantamento de hardware
+# 01 — Hardware survey
 
-Sistema: Fedora 44, kernel 7.2.5-200.fc44.x86_64, driver `xe`.
+System: Fedora 44, kernel 7.2.5-200.fc44.x86_64, `xe` driver.
 
-## A placa
+## The card
 
 ```
 04:00.0 VGA compatible controller [0300]: Intel Corporation Battlemage G21 [Arc B580] [8086:e20b]
@@ -12,71 +12,74 @@ Sistema: Fedora 44, kernel 7.2.5-200.fc44.x86_64, driver `xe`.
 	Subsystem: Device [207e:a002]
 ```
 
-O PCI ID `207e:a002` é o identificador da variante Onix Lumi — é por ele que o driver
-do OpenRGB deve reconhecer a placa.
+PCI ID `207e:a002` identifies the ONIX LUMI variant, and it is what the OpenRGB driver
+matches on.
 
-## Onde o LED **não** está
+## Where the LED is **not**
 
-**Não é USB.** `lsusb` não mostra nenhum dispositivo atrás da placa. Os únicos HIDs são
-periféricos e o `0b05:19af ASUSTek AURA LED Controller`, que é da **placa-mãe**.
-Isso descarta o padrão mais comum de GPU com RGB (MCU USB interno, tipo ASUS/MSI).
+**Not USB.** `lsusb` shows nothing behind the card. The only HIDs present are peripherals
+and `0b05:19af ASUSTek AURA LED Controller`, which belongs to the **motherboard**. That
+rules out the most common arrangement for RGB graphics cards: an onboard USB MCU, the way
+ASUS and MSI do it.
 
-**Não é o SMBus da placa-mãe.** Varredura do `i2c-16` (`SMBus I801 adapter at 0000:80:1f.4`):
+**Not the motherboard SMBus.** Scanning `i2c-16` (`SMBus I801 adapter at 0000:80:1f.4`):
 
 ```
 50: -- UU -- UU -- -- -- --  ...
 ```
 
-Só os SPDs dos módulos de memória (`UU` = reivindicados pelo kernel). Nada da GPU.
-Isso descarta a rota que o OpenRGB usa para GPUs ASUS/Gigabyte (pinos SMBus do slot PCIe).
+Only the memory modules' SPD EEPROMs (`UU` means claimed by a kernel driver). Nothing from
+the GPU. That rules out the route OpenRGB uses for ASUS and Gigabyte cards, over the PCIe
+slot's SMBus pins.
 
-## Onde o LED **está**
+## Where the LED **is**
 
-A GPU expõe 10 barramentos I²C próprios:
+The GPU exposes ten I²C buses of its own:
 
-| bus | nome | papel |
+| bus | name | role |
 |---|---|---|
-| i2c-3..i2c-11 | `i915 gmbus dpa..tc4` | DDC dos conectores de vídeo |
-| **i2c-15** | **`Synopsys DesignWare I2C adapter`** | **barramento interno da placa** |
-| i2c-16 | `SMBus I801` | placa-mãe (não é da GPU) |
+| i2c-3..i2c-11 | `i915 gmbus dpa..tc4` | DDC for the display connectors |
+| **i2c-15** | **`Synopsys DesignWare I2C adapter`** | **the card's internal bus** |
+| i2c-16 | `SMBus I801` | motherboard, not the GPU |
 
-O `i2c-15` é um controlador DesignWare instanciado pelo driver `xe`
-(`drivers/gpu/drm/xe/xe_i2c.c`) como `i2c_designware.1024`, filho direto de `0000:04:00.0`.
-Não é DDC — é o barramento de serviço da própria placa.
+`i2c-15` is a DesignWare controller the `xe` driver instantiates
+(`drivers/gpu/drm/xe/xe_i2c.c`) as `i2c_designware.1024`, a direct child of `0000:04:00.0`.
+It is not DDC — it is the card's own service bus.
 
-Varredura do i2c-15: **um único dispositivo, em `0x28`.**
+Scanning i2c-15: **exactly one device, at `0x28`.**
 
 ```
 20: -- -- -- -- -- -- -- -- 28 -- -- -- -- -- -- --
 ```
 
-E o kernel já sabe o que é:
+And the kernel already knows what it is:
 
 ```
 /sys/.../i2c_designware.1024/i2c-15/15-0028/name      -> amc
 /sys/.../i2c_designware.1024/i2c-15/15-0028/modalias  -> i2c:amc
-/sys/.../i2c_designware.1024/i2c-15/15-0028/driver    -> (não existe)
+/sys/.../i2c_designware.1024/i2c-15/15-0028/driver    -> (does not exist)
 ```
 
-**AMC = Add-in card Management Controller**, o microcontrolador de gerenciamento da
-placa. O `xe` o instancia com `I2C_CLIENT_HOST_NOTIFY` e trata alertas SMBus
-(`xe_amc_handle_alert`), mas **não liga nenhum driver nele** — o endereço fica livre
-para acesso via `/dev/i2c-15` do userspace.
+**AMC = Add-in card Management Controller**, the card's management microcontroller. `xe`
+instantiates it with `I2C_CLIENT_HOST_NOTIFY` and handles its SMBus alerts
+(`xe_amc_handle_alert`), but **binds no driver to it** — so the address is free for
+userspace access through `/dev/i2c-15`.
 
-O AMC é também o alvo do *late binding firmware* do `xe` (`xe_late_bind_fw.c`,
-atributos `lb_fan_control_version` e `lb_voltage_regulator_version` no sysfs da GPU),
-o que confirma que ele controla ventoinha e VRM — e é o candidato natural para o LED.
+The AMC is also the target of `xe`'s late binding firmware (`xe_late_bind_fw.c`, sysfs
+attributes `lb_fan_control_version` and `lb_voltage_regulator_version` on the GPU), which
+confirms it drives the fans and the voltage regulator — and makes it the natural candidate
+for the lighting too.
 
-## Permissões
+## Permissions
 
-Não precisa de root. O `systemd-logind` concede ACL `uaccess` ao usuário da sessão local:
+No root needed. `systemd-logind` grants the local session user a `uaccess` ACL:
 
 ```
 # file: dev/i2c-15
 user:arthur:rw-
 ```
 
-## Primeira sondagem (somente leitura)
+## First probe (read only)
 
 ```
 SMBus receive byte        -> 0xfe
@@ -87,20 +90,20 @@ read byte data 0x00..0x05 -> 0xfe
                     0x0f  -> 0x01
 ```
 
-O dispositivo faz ACK e responde. O padrão `0xfe` dominante com alguns `0x01` sugere
-**protocolo de comando/resposta**, não um mapa de registradores plano — provavelmente
-`0xFE` é um código de erro ("comando não suportado" / "sem resposta pendente") devolvido
-para qualquer leitura que não siga um comando válido.
+The device acknowledges and answers. The dominant `0xfe` with occasional `0x01` suggests a
+**command/response protocol** rather than a flat register map — `0xFE` probably meaning "no
+response pending" or "unsupported command" for any read that does not follow a valid
+command.
 
-Nenhum erro de I²C no `dmesg` após as leituras.
+No I²C errors in `dmesg` after these reads.
 
-## Conclusão
+## Conclusion
 
-O caminho é: **`/dev/i2c-15`, endereço `0x28`, protocolo do AMC**. O que falta é o
-conjunto de comandos — que vem da análise do app Windows (ver `docs/02-*`).
+The path is **`/dev/i2c-15`, address `0x28`, the AMC's protocol**. What is missing is the
+command set, which comes from analysing the Windows application (see `docs/04`).
 
-## Risco
+## Risk
 
-O AMC controla ventoinha e VRM. Escrita de comandos desconhecidos pode parar a
-refrigeração. Toda escrita deve ser feita com monitoramento de
-`/sys/class/hwmon/hwmon*/fan[123]_input` e temperatura em paralelo.
+The AMC controls the fans and the voltage regulator. Writing unknown commands can stop the
+cooling. Any write test has to run with `/sys/class/hwmon/hwmon*/fan[123]_input` and the
+temperature inputs watched in parallel.

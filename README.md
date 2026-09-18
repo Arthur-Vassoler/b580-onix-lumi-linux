@@ -1,98 +1,174 @@
-# Intel Arc B580 "Onix Lumi" — controle de LED ARGB no Linux
+# ONIX LUMI Intel Arc B580 — ARGB lighting on Linux
 
-Engenharia reversa do controle de iluminação da placa **ONIX LUMI Intel Arc B580 12GB**
-(PCI `8086:e20b`, subsystem `207e:a002`) com o objetivo de escrever um driver para o
+Reverse engineering of the lighting controller on the **ONIX LUMI Intel Arc B580 12GB**
+(PCI `8086:e20b`, subsystem `207e:a002`), and a driver that makes it work with
 [OpenRGB](https://openrgb.org).
 
-No Windows a iluminação é controlada pelo utilitário proprietário **LUMI ARGB Control
-Software v2.1** da ONIX. No Linux não existe suporte algum — nem no OpenRGB, nem em
-qualquer outro projeto. O issue upstream do OpenRGB para B580 está aberto e vazio.
+## The problem
 
-## Estado
+The card has an addressable RGB strip. ONIX ships **LUMI ARGB Control Software** to drive
+it — Windows only. On Linux there was nothing: not in OpenRGB, not anywhere else. The
+OpenRGB issue asking for Intel Arc B580 support had been open and empty since January 2025.
 
-| Etapa | Status |
+Intel's own position is that the Arc B580 has no RGB control application; the only Arc card
+they shipped lighting software for is the A770 Limited Edition, which uses an entirely
+different mechanism (a USB dongle on a motherboard header).
+
+## The result
+
+Full control of the lighting from Linux, no root required, with two front ends:
+
+```sh
+# OpenRGB, once the driver is built (see openrgb/README.md)
+openrgb --device 0 --mode static --color FF0000
+
+# or the standalone CLI in this repository, no build needed
+tools/lumi-led.py color ff0000
+tools/lumi-led.py mode rainbow
+tools/lumi-led.py off
+```
+
+All eight lighting modes work: Static, Direct, Rainbow, Chroma Flow, Taxiway Glow,
+Stacking, Breathing and One Color.
+
+## How it works
+
+The LED controller is **not** a USB device and it is **not** on the motherboard SMBus —
+the two places RGB graphics cards usually put it. It sits behind the card's **AMC**
+(Add-in card Management Controller) on the GPU's own internal I²C bus:
+
+```
+/dev/i2c-15   "Synopsys DesignWare I2C adapter"   (the GPU's internal bus)
+  └─ 0x28     i2c client "amc", instantiated by the xe driver, no driver bound
+```
+
+The protocol is a stream of `(register, value)` pairs written in a single I²C
+transaction. Selecting a mode, setting brightness and setting a colour are three separate
+transactions:
+
+```
+0x10  mode      0x3E  brightness   0x27  strip length (14 LEDs)
+0x1A/1B/1C  RGB (Custom)           0xC9/CA/CB  RGB (Breathing)
+
+modes: 00 Rainbow · 01 Custom · 02 Breathing · 03 Serial
+       04 Runway · 05 One Color · 06 Block Stacking
+```
+
+The full register map is in [`docs/05-led-protocol.md`](docs/05-led-protocol.md).
+
+## Requirements
+
+- An ONIX LUMI Intel Arc B580 (`207e:a002`). Other ONIX cards may share the protocol, but
+  none have been tested.
+- A kernel with the `xe` driver, which creates the internal I²C bus and its `amc` client.
+  Verified on Linux 7.2 / Fedora 44.
+- `i2c-tools` for `tools/survey.sh`. Python 3 with no external packages for everything else.
+
+No root needed: `systemd-logind` grants the local session user an ACL on `/dev/i2c-*`.
+Check yours with `getfacl /dev/i2c-15`.
+
+## Install
+
+### Option 1 — the standalone CLI
+
+Nothing to build.
+
+```sh
+cd b580-onix-lumi-linux
+tools/survey.sh              # confirm the AMC shows up at 0x28
+tools/lumi-led.py color ff0000
+```
+
+### Option 2 — the OpenRGB driver
+
+Needs building OpenRGB from source, because the driver is not upstream yet. Full
+instructions, including the Fedora dependency list, are in
+[`openrgb/README.md`](openrgb/README.md). In short:
+
+```sh
+git clone https://gitlab.com/CalcProgrammer1/OpenRGB.git
+cd OpenRGB
+git apply /path/to/b580-onix-lumi-linux/openrgb/patches/*.patch
+cp -r /path/to/b580-onix-lumi-linux/openrgb/Controllers/OnixArcController Controllers/
+qmake6 OpenRGB.pro && make -j$(nproc)
+./openrgb --list-devices
+```
+
+## Safety
+
+**The AMC also controls the card's fans and voltage regulator.** Writing unknown registers
+can stop the cooling. Everything in this repository stays within the register set the
+vendor's own software uses, and the tools print GPU fan and temperature readings around
+every write.
+
+Two hardware quirks are worth knowing before you experiment, both learned the hard way and
+written up in [`docs/03-pitfalls.md`](docs/03-pitfalls.md):
+
+- **Never batch a mode change with other registers in one transaction.** The card accepts
+  the packet, echoes it back, and the lighting goes dark.
+- **Never read more bytes than the device has to give.** A multi-byte read with nothing
+  queued leaves the AMC holding SDA low, and the whole bus stays dead until the card is
+  power cycled.
+
+## Documentation
+
+The write-up is the point of this repository as much as the code is. It is meant to be
+enough for someone to redo the work, or to port it to another card.
+
+| | |
 |---|---|
-| Mapear barramentos e achar o controlador | ✅ feito |
-| Confirmar que o controlador responde | ✅ feito |
-| Extrair o protocolo do app Windows | ✅ feito — tabela de registradores completa |
-| Validar os comandos no hardware | ✅ feito — LED sob controle no Linux |
-| Driver OpenRGB (C++) | ✅ feito — compilado e validado |
-| Submeter upstream | ⬜ |
-| Submeter upstream | ⬜ |
+| [`01-hardware-survey.md`](docs/01-hardware-survey.md) | finding the controller, and ruling out USB and the motherboard SMBus |
+| [`02-amc-protocol.md`](docs/02-amc-protocol.md) | the AMC's MCTP alert channel, straight from the kernel driver |
+| [`03-pitfalls.md`](docs/03-pitfalls.md) | what wedges the bus, and how to recover |
+| [`04-windows-app.md`](docs/04-windows-app.md) | extracting and decompiling the vendor software |
+| [`05-led-protocol.md`](docs/05-led-protocol.md) | the complete register map |
+| [`06-hardware-validation.md`](docs/06-hardware-validation.md) | what was measured, and what broke on the way |
 
-## Achado principal
+## Tools
 
-O LED **não** é um dispositivo USB (a placa não expõe nenhum) e **não** está no SMBus da
-placa-mãe. Ele está atrás do **AMC** (*Add-in card Management Controller*), o MCU de
-gerenciamento da própria placa:
+| | |
+|---|---|
+| `tools/lumi-led.py` | control the lighting |
+| `tools/survey.sh` | hardware inventory: buses, clients, sensors |
+| `tools/recover-bus.sh` | when the I²C bus stops responding (needs root) |
+| `tools/extract-lumi.py` | unpack the vendor installer |
+| `tools/dotnet-il.py` | list and disassemble .NET assemblies |
+| `tools/amc-mctp.py` | the AMC's MCTP framing — documentation, never run against hardware |
 
-```
-/dev/i2c-15   "Synopsys DesignWare I2C adapter"  (barramento interno da GPU)
-  └─ 0x28     client "amc", instanciado pelo driver xe, sem driver ligado
-```
+`tools/dotnet_meta.py` is a minimal ECMA-335 metadata reader, written because Fedora's
+`monodis` aborts on the vendor's assembly. `tools/amc.py` talks to `/dev/i2c-*` through
+ioctls directly, with no external dependencies.
 
-O app oficial do Windows confirma o alvo: `OnixI2CDriver.dll` carrega a string literal
-`\\.\nf_i2c_bus_00_0x0028` — o mesmo dispositivo.
+## Contributing
 
-**O protocolo é escrita de pares `(registrador, valor)`**, vários por transação, seguida
-da leitura de 1 byte de status. Tabela completa em
-[`docs/05-protocolo-led.md`](docs/05-protocolo-led.md):
+Reports from other cards are the most useful thing right now. If you have an ONIX card
+that is not the LUMI B580, `tools/survey.sh` output plus the PCI subsystem ID tells us
+whether the protocol carries over.
 
-```
-0x10 modo   0x3E brilho   0x1A/1B/1C cor (Custom)   0xC9/CA/CB cor (Breathing)
-modos: 00 Rainbow · 01 Custom · 02 Breathing · 03 Serial · 04 Runway
-       05 One Color · 06 Block Stacking
-```
+Open questions, in rough order of how much they would improve the driver:
 
-Detalhes em [`docs/01`](docs/01-hardware-survey.md) a [`docs/05`](docs/05-protocolo-led.md).
+- **Per-LED addressing.** The strip has 14 physically distinct LEDs but no known way to
+  address them individually. The search so far, and why it stopped, is documented at the
+  end of [`docs/05-led-protocol.md`](docs/05-led-protocol.md). Reopening it needs a *new
+  source of evidence* — AMC firmware, a newer ONIX utility, vendor documentation — not
+  more blind writes.
+- **What the "response" registers do.** Without them an effect lights up but never
+  animates. That is all that is known.
+- **The usable range and direction of the speed parameters.** Values 1 to 64 all keep the
+  effects running; the perceptible difference is subtle and the direction is unclear.
 
-## Onde paramos
+If you send patches, please keep the OpenRGB driver in OpenRGB's code style, since the
+goal is to land it upstream.
 
-**Funciona.** Controle completo do LED a partir do Linux, sem root e sem o software do
-fabricante — validado no hardware em 18/09/2026 (ver
-[`docs/06-validacao-hardware.md`](docs/06-validacao-hardware.md)).
+## Upstream status
 
-```sh
-tools/lumi-led.py color ff0000       # vermelho fixo
-tools/lumi-led.py mode rainbow       # arco-íris
-tools/lumi-led.py off
-```
+Not submitted yet. The driver and the two patches apply cleanly against OpenRGB master and
+are ready to go; see [`openrgb/README.md`](openrgb/README.md).
 
-A armadilha principal: **nunca agrupe a troca de modo com outros registradores na mesma
-transação** — o comando é aceito e o LED apaga. Uma operação lógica por transação.
+## License
 
-A fita tem **14 LEDs**, declarados ao firmware pelo registrador `0x27`. Não há como
-endereçá-los individualmente: procuramos e documentamos o negativo em
-[`docs/05`](docs/05-protocolo-led.md).
+GPL-2.0-or-later, matching OpenRGB.
 
-O driver do OpenRGB também está pronto, compilado contra o master upstream e validado:
-a placa aparece como `ONIX LUMI Intel Arc B580` e os oito modos funcionam.
-
-```
-$ ./openrgb --list-devices
-0: ONIX LUMI Intel Arc B580
-```
-
-Falta só submeter upstream — ver [`openrgb/README.md`](openrgb/README.md).
-
-## Aviso
-
-O AMC também controla **ventoinhas e regulador de tensão** da placa. Escritas às cegas
-podem desligar a refrigeração ou corromper configuração. Tudo neste repositório que
-escreve no barramento é explicitamente marcado como tal.
-
-## Uso
-
-```sh
-tools/lumi-led.py --dry-run color ff0000   # mostra os bytes sem escrever
-tools/lumi-led.py color ff0000             # vermelho fixo
-tools/lumi-led.py mode rainbow --speed 5
-tools/lumi-led.py off
-
-tools/survey.sh                            # inventário de hardware
-tools/extract-lumi.py LUMISetupV2.1.exe    # extrai os binários do app oficial
-tools/dotnet-il.py LUMI.exe --list         # desmonta o assembly .NET
-sudo tools/recover-bus.sh                  # quando o barramento trava
-```
-
-Ambos rodam sem root: o `systemd-logind` dá ACL de `/dev/i2c-*` ao usuário da sessão local.
+The vendor software is not redistributed here. `tools/extract-lumi.py` reproduces the
+extraction from the installer ONIX publishes; the download is documented in
+[`docs/04-windows-app.md`](docs/04-windows-app.md).
