@@ -37,7 +37,7 @@ REGS = {
     0x18: "rainbow.response", 0x19: "rainbow.speed",
     0x1A: "custom.R", 0x1B: "custom.G", 0x1C: "custom.B",
     0x20: "stacking.speed",
-    0x27: "init.desconhecido",
+    0x27: "comprimento.fita",
     0x3E: "brilho",
     0xC8: "breathing.tempo",
     0xC9: "breathing.R", 0xCA: "breathing.G", 0xCB: "breathing.B",

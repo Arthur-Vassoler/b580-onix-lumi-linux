@@ -45,7 +45,7 @@ que o kernel usa no mesmo endereço; o LED usa escrita de registrador direta.
 | `0x1B` | Custom: **G** | 0–255 |
 | `0x1C` | Custom: **B** | 0–255 |
 | `0x20` | BlockStacking: speed | padrão 10 |
-| `0x27` | — | só aparece na init, sempre `0x0E` |
+| `0x27` | **comprimento da fita** | `0x0E` = 14 LEDs |
 | `0x29` | Runway: chaser | padrão 1 |
 | `0x3E` | **brilho** | padrão `0x88` (136) |
 | `0xC8` | Breathing: tempo | padrão 6 |
@@ -127,10 +127,28 @@ O driver deve expor:
 Uma zona única, cor global. `MODE_COLORS_MODE_SPECIFIC` para Static e Breathing,
 `MODE_COLORS_NONE` para os demais.
 
+## A placa tem 14 LEDs
+
+`0x27` é a contagem de LEDs. Medido com o Block Stacking, que acende um ponto por vez:
+com `0x27` em 4, 7 e 14 o efeito enche em 4, 7 e 14 degraus, exatamente. E 14 é o número
+de pontos que se contam na fita.
+
+Foi por isso que variar o registrador *parecia* mudar a velocidade: numa fita declarada
+mais curta o ciclo fecha antes, e a olho nu isso se confunde com um efeito mais rápido.
+
+O utilitário da ONIX escreve `0x27 = 0x0E` na inicialização e nunca mais toca. Não é um
+parâmetro de usuário — é a declaração do hardware.
+
+**Mas não há como endereçar os LEDs individualmente** por nada que se conheça do
+protocolo: o app do fabricante escreve uma cor só, para a fita inteira, e não existe
+outro caminho no binário dele (os 23 chamadores de `WriteReadAsync` estão todos
+catalogados em `docs/04`).
+
 ## O que ainda não se sabe
 
 - O significado exato de "response" (`0x11`, `0x13`, `0x16`, `0x18`) e os intervalos
   válidos de cada parâmetro. Os padrões estão acima; os limites dos sliders estão no
   BAML dentro de `.rsrc` e ainda não foram extraídos.
-- O que `0x27 = 0x0E` faz. Aparece só na init, sempre com o mesmo valor.
-- Quantos LEDs a placa tem, e se algum modo aceita endereçamento individual.
+- Se existe algum caminho não documentado para endereçar os 14 LEDs individualmente.
+  O app do fabricante não tem nenhum, e procurar exigiria escrever em registradores
+  desconhecidos de um chip que também controla ventoinha e VRM.

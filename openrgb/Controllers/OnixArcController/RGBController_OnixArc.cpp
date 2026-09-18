@@ -201,8 +201,11 @@ RGBController_OnixArc::~RGBController_OnixArc()
 void RGBController_OnixArc::SetupZones()
 {
     /*-----------------------------------------------------*\
-    | The card exposes no per-LED addressing, so a single    |
-    | LED stands for the whole illuminated area.             |
+    | The strip holds 14 LEDs, which register 0x27 declares   |
+    | to the firmware, but nothing in the protocol addresses  |
+    | them individually: colour goes to the whole strip at    |
+    | once.  A single LED is therefore the honest             |
+    | representation, rather than 14 that always match.       |
     \*-----------------------------------------------------*/
     zone lighting_zone;
     lighting_zone.name          = "Graphics Card";

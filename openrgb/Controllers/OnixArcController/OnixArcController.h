@@ -38,7 +38,7 @@ enum
     ONIX_REG_CUSTOM_GREEN           = 0x1B,
     ONIX_REG_CUSTOM_BLUE            = 0x1C,
     ONIX_REG_STACKING_SPEED         = 0x20,
-    ONIX_REG_INIT_UNKNOWN           = 0x27,
+    ONIX_REG_STRIP_LENGTH           = 0x27,   /* LED count; the card has 14 */
     ONIX_REG_RUNWAY_CHASER          = 0x29,
     ONIX_REG_BRIGHTNESS             = 0x3E,
     ONIX_REG_BREATHING_TEMPO        = 0xC8,
