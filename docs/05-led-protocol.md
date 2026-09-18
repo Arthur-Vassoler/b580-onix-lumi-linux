@@ -41,7 +41,7 @@ kernel uses at the same address; the LED uses plain register writes.
 | `0x14` | direction | argument of `LedDirection` |
 | `0x16` | Serial: **speed** | default 2 — vendor calls it "response" |
 | `0x17` | Serial: density | default 16 — vendor calls it "speed" |
-| `0x18` | Rainbow: **speed** | default 2 — vendor calls it "response" |
+| `0x18` | Rainbow: **speed** | 1–255, default 2 — vendor calls it "response" |
 | `0x19` | Rainbow: density | default 5 — vendor calls it "speed" |
 | `0x1A` | Custom: **R** | 0–255 |
 | `0x1B` | Custom: **G** | 0–255 |

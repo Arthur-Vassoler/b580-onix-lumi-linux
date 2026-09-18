@@ -39,13 +39,14 @@
 | byte range is exposed.                                     |
 \*---------------------------------------------------------*/
 /*---------------------------------------------------------*\
-| Speed is the animation rate, and raising it visibly speeds   |
-| the effect up.  Values 1, 2, 4 and 10 were measured and are  |
-| monotonic; anything above that has not been characterised,   |
-| so the slider stops where the evidence does.                 |
+| Speed is the animation rate.  Measured across 1, 2, 4, 10,   |
+| 20, 30, 50, 80, 128 and 255 with the bus held exclusively:    |
+| it keeps getting faster all the way up, with no saturation    |
+| or erratic behaviour, so the whole byte is usable.  Zero is   |
+| excluded because it stops the effect rather than slowing it.  |
 \*---------------------------------------------------------*/
 #define ONIX_SPEED_MIN              0x01
-#define ONIX_SPEED_MAX              0x0A
+#define ONIX_SPEED_MAX              0xFF
 
 /*---------------------------------------------------------*\
 | Every animated mode carries a "response" register in        |

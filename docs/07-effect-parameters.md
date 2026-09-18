@@ -124,12 +124,18 @@ taken as sound because the changes were consistent and repeated across four cons
 steps, which a sporadic interfering write would not produce — but they were not measured
 under exclusive access.
 
-The upper end of the rate is **not** established. A range test covering 1 to 255 was run
-while that GUI was still open and is therefore discarded. The driver's slider stops at 10,
-the highest value actually observed to be monotonic.
+The first range test was run while that GUI was still open and was discarded. It was then
+**re-run with the bus held exclusively**, after confirming with `fuser /dev/i2c-15` that
+nothing else had it open.
+
+### Speed range — measured with exclusive bus access
+
+Values 10, 20, 30, 50, 80, 128 and 255 all kept accelerating, with no saturation point and
+no erratic behaviour. The whole byte is usable, so the driver's slider runs 1 to 255. Zero
+is excluded: it stops the effect rather than slowing it, which is what made a mode entered
+without this register look frozen.
 
 ### Still to do
 
-- Re-run the range test with exclusive access to set the slider maximum on evidence.
 - Run this protocol for Serial (`0x16`/`0x17`) and Runway (`0x11`/`0x12`). The driver
-  currently applies Rainbow's reading to them by analogy.
+  currently applies Rainbow's reading to them by analogy, marked as inferred in the code.
