@@ -187,7 +187,6 @@ void RGBController_OnixArc::SetupZones()
     lighting_zone.leds_min      = 1;
     lighting_zone.leds_max      = 1;
     lighting_zone.leds_count    = 1;
-    lighting_zone.matrix_map    = NULL;
     zones.push_back(lighting_zone);
 
     led lighting_led;
