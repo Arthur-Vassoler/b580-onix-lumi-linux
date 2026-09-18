@@ -24,7 +24,14 @@ o controlador DesignWare que quebrou, é o escravo que não solta a linha.
 runtime PM `on`, depois unbind/rebind do driver `i2c_designware`. Se o AMC estiver mesmo
 segurando SDA, nada em userspace resolve — só ciclo de energia (reboot).
 
-**Regra.** Leitura crua só imediatamente depois de uma requisição MCTP e do delay de 20 ms.
+**Refinamento, depois de conhecer o protocolo do LED.** O AMC espera pares
+`(registrador, valor)` (ver `docs/05-protocolo-led.md`). A varredura que precedeu o
+travamento usou `read_byte_data`, que na prática escreve **um** byte e lê — ou seja,
+256 pares incompletos seguidos. Isso provavelmente já tinha deixado o dispositivo
+no meio de uma transação; a leitura crua só terminou de derrubar. Vale como regra
+prática: **nunca escreva um número ímpar de bytes** neste dispositivo.
+
+**Regra.** Leitura crua só imediatamente depois de uma escrita completa.
 Use `tools/amc-mctp.py`, que faz o par requisição/resposta junto. O `raw_read()` solto
 continua no código apenas como documentação e exige `i_know_the_risk=True`.
 

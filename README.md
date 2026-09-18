@@ -14,10 +14,8 @@ qualquer outro projeto. O issue upstream do OpenRGB para B580 está aberto e vaz
 |---|---|
 | Mapear barramentos e achar o controlador | ✅ feito |
 | Confirmar que o controlador responde | ✅ feito |
-| Descobrir o formato dos pacotes | ✅ feito (é MCTP, veio do kernel) |
-| Descoberta MCTP no hardware | 🚧 barramento travado, precisa de reboot |
-| Achar o comando do LED no app Windows | 🚧 em andamento |
-| Validar comandos no hardware | ⬜ |
+| Extrair o protocolo do app Windows | ✅ feito — tabela de registradores completa |
+| Validar os comandos no hardware | 🚧 barramento travado, precisa de reboot |
 | Driver OpenRGB (C++) | ⬜ |
 | Submeter upstream | ⬜ |
 
@@ -32,12 +30,20 @@ gerenciamento da própria placa:
   └─ 0x28     client "amc", instanciado pelo driver xe, sem driver ligado
 ```
 
-O AMC não tem registradores: ele é um **endpoint MCTP** (DMTF DSP0236) sobre SMBus, com
-mensagens *Vendor Defined – PCI*. O formato exato do pacote está no próprio driver da
-Intel (`drivers/gpu/drm/xe/xe_amc.c`), então essa parte não precisou de adivinhação.
+O app oficial do Windows confirma o alvo: `OnixI2CDriver.dll` carrega a string literal
+`\\.\nf_i2c_bus_00_0x0028` — o mesmo dispositivo.
 
-Detalhes em [`docs/01-hardware-survey.md`](docs/01-hardware-survey.md) e
-[`docs/02-protocolo-amc.md`](docs/02-protocolo-amc.md).
+**O protocolo é escrita de pares `(registrador, valor)`**, vários por transação, seguida
+da leitura de 1 byte de status. Tabela completa em
+[`docs/05-protocolo-led.md`](docs/05-protocolo-led.md):
+
+```
+0x10 modo   0x3E brilho   0x1A/1B/1C cor (Custom)   0xC9/CA/CB cor (Breathing)
+modos: 00 Rainbow · 01 Custom · 02 Breathing · 03 Serial · 04 Runway
+       05 One Color · 06 Block Stacking
+```
+
+Detalhes em [`docs/01`](docs/01-hardware-survey.md) a [`docs/05`](docs/05-protocolo-led.md).
 
 ## Aviso
 
@@ -48,10 +54,15 @@ escreve no barramento é explicitamente marcado como tal.
 ## Uso
 
 ```sh
-tools/survey.sh              # inventário de hardware
-tools/amc-mctp.py --self-test  # valida o empacotamento MCTP, não toca no hardware
-tools/amc-mctp.py discover     # descoberta MCTP no AMC (somente leitura)
-sudo tools/recover-bus.sh      # quando o barramento trava
+tools/lumi-led.py --dry-run color ff0000   # mostra os bytes sem escrever
+tools/lumi-led.py color ff0000             # vermelho fixo
+tools/lumi-led.py mode rainbow --speed 5
+tools/lumi-led.py off
+
+tools/survey.sh                            # inventário de hardware
+tools/extract-lumi.py LUMISetupV2.1.exe    # extrai os binários do app oficial
+tools/dotnet-il.py LUMI.exe --list         # desmonta o assembly .NET
+sudo tools/recover-bus.sh                  # quando o barramento trava
 ```
 
 Ambos rodam sem root: o `systemd-logind` dá ACL de `/dev/i2c-*` ao usuário da sessão local.

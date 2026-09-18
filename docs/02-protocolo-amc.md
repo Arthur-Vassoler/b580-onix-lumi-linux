@@ -104,6 +104,17 @@ mostra. Tudo isso é leitura, definido por norma, e sem efeito colateral.
 A ordem de ataque é: descoberta MCTP primeiro (barata e segura), análise do app Windows
 em paralelo, e só então varredura do espaço de comandos.
 
+## Importante: MCTP não é o canal do LED
+
+Este documento descreve o canal de **alerta** que o driver `xe` usa. A análise do app
+Windows (`docs/04-app-windows.md`) mostrou que o LED usa outra coisa no mesmo endereço:
+escrita direta de pares `(registrador, valor)`, sem framing MCTP nenhum
+(`docs/05-protocolo-led.md`).
+
+Os dois convivem em `0x28`. Note que o command code de MCTP sobre SMBus é `0x0F`, que
+é também o registrador de *bypass* do LED — uma colisão aparente que ainda não foi
+investigada. Na dúvida, prefira mandar o `0x0F` acompanhado do seu valor, como o app faz.
+
 ## Referências
 
 - `drivers/gpu/drm/xe/xe_amc.c`, `xe_i2c.c`, `xe_i2c.h` — kernel Linux
