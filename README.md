@@ -182,6 +182,7 @@ enough for someone to redo the work, or to port it to another card.
 | [`04-windows-app.md`](docs/04-windows-app.md) | extracting and decompiling the vendor software |
 | [`05-led-protocol.md`](docs/05-led-protocol.md) | the complete register map |
 | [`06-hardware-validation.md`](docs/06-hardware-validation.md) | what was measured, and what broke on the way |
+| [`07-effect-parameters.md`](docs/07-effect-parameters.md) | open: a protocol for working out what the speed registers really do |
 
 ## Tools
 
@@ -213,8 +214,10 @@ Open questions, in rough order of how much they would improve the driver:
   more blind writes.
 - **What the "response" registers do.** Without them an effect lights up but never
   animates. That is all that is known.
-- **The usable range and direction of the speed parameters.** Values 1 to 64 all keep the
-  effects running; the perceptible difference is subtle and the direction is unclear.
+- **What the speed registers actually do.** Raising `0x19` appears to narrow the rainbow's
+  gradient rather than speed it up, which would make it a spatial parameter that the driver
+  currently drives from the wrong slider. [`docs/07-effect-parameters.md`](docs/07-effect-parameters.md)
+  is a protocol for settling it with measurements instead of impressions.
 
 If you send patches, please keep the OpenRGB driver in OpenRGB's code style, since the
 goal is to land it upstream.
