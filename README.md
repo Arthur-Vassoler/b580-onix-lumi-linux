@@ -45,6 +45,26 @@ modos: 00 Rainbow · 01 Custom · 02 Breathing · 03 Serial · 04 Runway
 
 Detalhes em [`docs/01`](docs/01-hardware-survey.md) a [`docs/05`](docs/05-protocolo-led.md).
 
+## Onde paramos
+
+O protocolo está extraído e as ferramentas prontas, mas **nada foi validado no
+hardware ainda**: uma sondagem malfeita travou o barramento (ver
+[`docs/03-armadilhas.md`](docs/03-armadilhas.md)) e o `0x28` só volta com ciclo de
+energia. Próximo passo, depois de reiniciar:
+
+```sh
+tools/survey.sh                            # confirma que o 0x28 reapareceu
+tools/lumi-led.py --dry-run color ff0000   # revisa os bytes
+tools/lumi-led.py color ff0000             # o teste de verdade
+```
+
+Se não acender mas também não der erro de I²C, mande a init antes
+(`tools/lumi-led.py init`) — é o que o app oficial faz.
+
+O material do fabricante fica em `vendor/` (fora do git). Se sumir, o
+`tools/extract-lumi.py` reconstrói tudo a partir do instalador; o download original
+está documentado em [`docs/04-app-windows.md`](docs/04-app-windows.md).
+
 ## Aviso
 
 O AMC também controla **ventoinhas e regulador de tensão** da placa. Escritas às cegas
