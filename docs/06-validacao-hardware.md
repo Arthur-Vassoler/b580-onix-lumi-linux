@@ -115,14 +115,21 @@ Feita depois de dar o projeto por pronto, e que achou coisa.
 
 ### Um defeito ativo que eu tinha deixado no repositório
 
-`tools/amc-probe.py` varria `0x00..0xff` com `read_byte_data` **por padrão**. Como o AMC
-espera pares `(registrador, valor)`, isso são 256 escritas pela metade em sequência —
-exatamente o padrão que precedeu o travamento do barramento no início do projeto. Quem
-clonasse o repositório e rodasse a ferramenta podia derrubar a placa e precisar reiniciar.
+Havia uma ferramenta de sondagem, `tools/amc-probe.py`, do começo do projeto — de quando
+o protocolo ainda era desconhecido. Ela varria `0x00..0xff` com `read_byte_data` **por
+padrão**. Como o AMC espera pares `(registrador, valor)`, isso são 256 escritas pela
+metade em sequência: exatamente o padrão que precedeu o travamento do barramento no
+início do projeto. Quem clonasse o repositório e a rodasse podia derrubar a placa e
+precisar reiniciar.
 
-A varredura agora exige `--sweep` e explica o risco. `tools/amc-mctp.py`, que nunca
-chegou a rodar no hardware e faz uma leitura de 32 bytes, exige
-`AMC_MCTP_EXPERIMENTAL=1`.
+A varredura foi primeiro colocada atrás de um `--sweep`, e depois a ferramenta inteira
+saiu do repositório: com o protocolo já conhecido (`docs/05`), o AMC não tem mapa de
+registradores legível, então a varredura era arriscada **e** sem sentido. O que ela
+tinha de útil, o `tools/survey.sh` faz melhor.
+
+`tools/amc-mctp.py` ficou, porque documenta um protocolo real do kernel que ninguém mais
+escreveu em Python — mas, como nunca chegou a rodar no hardware e faz uma leitura de 32
+bytes, exige `AMC_MCTP_EXPERIMENTAL=1`.
 
 ### O modo era reescrito a cada atualização de cor
 
