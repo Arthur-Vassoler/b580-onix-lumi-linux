@@ -65,20 +65,43 @@ enum
 \*---------------------------------------------------------*/
 #define ONIX_BRIGHTNESS_DEFAULT     0x88
 
+/*---------------------------------------------------------*\
+| Number of LEDs on the strip, which register 0x27 declares   |
+| to the firmware.  The vendor tool writes it once at         |
+| startup; effects run over however many LEDs it says, so a   |
+| stale value makes them cover only part of the strip.        |
+\*---------------------------------------------------------*/
+#define ONIX_STRIP_LENGTH           0x0E
+
 class OnixArcController
 {
 public:
-    OnixArcController(i2c_smbus_interface* bus, unsigned char address, const std::string& name);
+    OnixArcController(i2c_smbus_interface* bus,
+                      unsigned char address,
+                      const std::string& name);
     ~OnixArcController();
 
     std::string     GetDeviceName();
     std::string     GetDeviceLocation();
 
+    /*-----------------------------------------------------*\
+    | Declares the strip length to the firmware.  Idempotent |
+    | and invisible: it does not change what is lit, it only |
+    | tells the card how many LEDs the effects span.         |
+    |                                                        |
+    | The vendor tool also writes brightness and the bypass  |
+    | flag at startup, from its own configuration file.  We  |
+    | write neither: brightness would override whatever the  |
+    | user last set, and bypass hands the strip over to the  |
+    | motherboard's ARGB header, which is a user preference   |
+    | this driver has no business flipping on detection.     |
+    \*-----------------------------------------------------*/
+    void            Initialize();
+
     void            SetMode(unsigned char mode);
     void            SetBrightness(unsigned char brightness);
-    void            SetDirection(unsigned char direction);
-    void            SetCustomColor(unsigned char red, unsigned char green, unsigned char blue);
-    void            SetBreathingColor(unsigned char red, unsigned char green, unsigned char blue);
+    void            SetCustomColor(unsigned char r, unsigned char g, unsigned char b);
+    void            SetBreathingColor(unsigned char r, unsigned char g, unsigned char b);
     void            SetRegister(unsigned char reg, unsigned char value);
 
 private:

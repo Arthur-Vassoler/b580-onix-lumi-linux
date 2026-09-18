@@ -193,18 +193,6 @@ class Assembly:
         e = self.pe.b.find(b"\x00", base + idx)
         return self.pe.b[base + idx:e].decode("utf-8", "replace")
 
-    def blob(self, idx):
-        base, _ = self.streams["#Blob"]
-        o = base + idx
-        b = self.pe.b
-        n = b[o]
-        if n & 0x80 == 0: o += 1
-        elif n & 0xC0 == 0x80:
-            n = ((n & 0x3F) << 8) | b[o + 1]; o += 2
-        else:
-            n = ((n & 0x1F) << 24) | (b[o+1] << 16) | (b[o+2] << 8) | b[o+3]; o += 4
-        return b[o:o + n]
-
     def userstring(self, idx):
         base, size = self.streams.get("#US", (0, 0))
         if not base or idx >= size: return None

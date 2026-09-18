@@ -155,6 +155,57 @@ def check_regs(pairs, force):
               "Use --force if you are sure.")
 
 
+def build_transactions(args) -> list[list[tuple[int, int]]]:
+    """Turn parsed arguments into a list of I2C transactions.
+
+    Each element is one transaction, and the split matters: a mode change must
+    never share a transaction with anything else (docs/06-hardware-validation.md).
+    """
+    txs: list[list[tuple[int, int]]] = []
+    if args.cmd == "init":
+        txs = [[(0x3E, DEFAULT_BRIGHTNESS), (0x0F, 0x00), (0x27, 0x0E)]]
+    elif args.cmd == "off":
+        txs = [[(0x3E, 0x00)]]
+    elif args.cmd == "on":
+        txs = [[(0x3E, args.brightness)]]
+    elif args.cmd == "brightness":
+        txs = [[(0x3E, args.value)]]
+    elif args.cmd == "bypass":
+        txs = [[(0x0F, 1 if args.state == "on" else 0)]]
+    elif args.cmd == "color":
+        r, g, b = args.rgb
+        bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
+        # order validated on hardware: mode, brightness, colour - each on its own
+        txs = [[(0x10, MODES["custom"])], [(0x3E, bright)],
+               [(0x1A, r), (0x1B, g), (0x1C, b)]]
+    elif args.cmd == "breathing":
+        r, g, b = args.rgb
+        bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
+        txs = [[(0x10, MODES["breathing"])], [(0x3E, bright)],
+               [(0xC9, r), (0xCA, g), (0xCB, b)]]
+        if args.tempo is not None:
+            txs.append([(0xC8, args.tempo)])
+    elif args.cmd == "mode":
+        txs = [[(0x10, MODES[args.name])]]
+        bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
+        txs.append([(0x3E, bright)])
+        # effect parameters are always written: without "response" the mode
+        # lights up but never animates (docs/06-hardware-validation.md)
+        for pname, (reg, default) in MODE_PARAMS[args.name].items():
+            val = getattr(args, pname, None)
+            txs.append([(reg, default if val is None else val)])
+    elif args.cmd == "raw":
+        pairs = []
+        for item in args.pairs.replace(",", " ").split():
+            reg, _, val = item.partition(":")
+            if not val:
+                raise SystemExit(f"invalid pair: {item!r} (use reg:val)")
+            pairs.append((int(reg, 16), int(val, 16)))
+        txs = [pairs]
+
+    return txs
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -201,48 +252,7 @@ def main():
 
     args = ap.parse_args()
 
-    # each element of txs is a separate I2C transaction
-    txs: list[list[tuple[int, int]]] = []
-    if args.cmd == "init":
-        txs = [[(0x3E, DEFAULT_BRIGHTNESS), (0x0F, 0x00), (0x27, 0x0E)]]
-    elif args.cmd == "off":
-        txs = [[(0x3E, 0x00)]]
-    elif args.cmd == "on":
-        txs = [[(0x3E, args.brightness)]]
-    elif args.cmd == "brightness":
-        txs = [[(0x3E, args.value)]]
-    elif args.cmd == "bypass":
-        txs = [[(0x0F, 1 if args.state == "on" else 0)]]
-    elif args.cmd == "color":
-        r, g, b = args.rgb
-        bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
-        # order validated on hardware: mode, brightness, colour - each on its own
-        txs = [[(0x10, MODES["custom"])], [(0x3E, bright)],
-               [(0x1A, r), (0x1B, g), (0x1C, b)]]
-    elif args.cmd == "breathing":
-        r, g, b = args.rgb
-        bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
-        txs = [[(0x10, MODES["breathing"])], [(0x3E, bright)],
-               [(0xC9, r), (0xCA, g), (0xCB, b)]]
-        if args.tempo is not None:
-            txs.append([(0xC8, args.tempo)])
-    elif args.cmd == "mode":
-        txs = [[(0x10, MODES[args.name])]]
-        bright = DEFAULT_BRIGHTNESS if args.brightness is None else args.brightness
-        txs.append([(0x3E, bright)])
-        # effect parameters are always written: without "response" the mode
-        # lights up but never animates (docs/06-hardware-validation.md)
-        for pname, (reg, default) in MODE_PARAMS[args.name].items():
-            val = getattr(args, pname, None)
-            txs.append([(reg, default if val is None else val)])
-    elif args.cmd == "raw":
-        pairs = []
-        for item in args.pairs.replace(",", " ").split():
-            reg, _, val = item.partition(":")
-            if not val:
-                raise SystemExit(f"invalid pair: {item!r} (use reg:val)")
-            pairs.append((int(reg, 16), int(val, 16)))
-        txs = [pairs]
+    txs = build_transactions(args)
 
     check_regs([p for tx in txs for p in tx], args.force)
 

@@ -42,20 +42,10 @@ MSG_TYPE_CONTROL   = 0x00
 MSG_TYPE_VENDOR_PCI = 0x7E
 
 VENDOR_INTEL = 0x8086
-VENDOR_ONIX  = 0x207E
 
 ALERT_REASON = {
     0: "desconhecido", 1: "Firmware Download", 2: "Thermal Trip",
     3: "OOB Request", 4: "OOB Reset", 5: "Catastrophic",
-}
-
-# MCTP control (DSP0236)
-CTRL_CMDS = {
-    0x02: "Get Endpoint ID",
-    0x03: "Get Endpoint UUID",
-    0x04: "Get MCTP Version Support",
-    0x05: "Get Message Type Support",
-    0x06: "Get Vendor Defined Message Support",
 }
 
 COMPLETION_CODES = {

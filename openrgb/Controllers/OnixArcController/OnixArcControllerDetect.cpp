@@ -33,13 +33,24 @@ static bool TestForOnixArcController(i2c_smbus_interface* bus, unsigned char add
     return(bus->i2c_smbus_read_byte(address) >= 0);
 }
 
-DetectedControllers DetectOnixArcGPUControllers(i2c_smbus_interface* bus, uint8_t i2c_addr, const std::string& name)
+DetectedControllers DetectOnixArcGPUControllers(i2c_smbus_interface* bus,
+                                                uint8_t i2c_addr,
+                                                const std::string& name)
 {
     DetectedControllers detected_controllers;
 
     if(TestForOnixArcController(bus, i2c_addr))
     {
         OnixArcController*      controller      = new OnixArcController(bus, i2c_addr, name);
+
+        /*-------------------------------------------------*\
+        | Tell the firmware how long the strip is before     |
+        | anything else talks to it.  Without this the card  |
+        | keeps whatever length it was last given, and the   |
+        | effects span only part of the strip.               |
+        \*-------------------------------------------------*/
+        controller->Initialize();
+
         RGBController_OnixArc*  rgb_controller  = new RGBController_OnixArc(controller);
 
         detected_controllers.push_back(rgb_controller);
@@ -52,4 +63,8 @@ DetectedControllers DetectOnixArcGPUControllers(i2c_smbus_interface* bus, uint8_
     return(detected_controllers);
 }
 
-REGISTER_I2C_PCI_DETECTOR("ONIX LUMI Intel Arc B580", DetectOnixArcGPUControllers, INTEL_VEN, INTEL_ARC_B580_DEV, ONIX_SUB_VEN, ONIX_LUMI_ARC_B580, ONIX_ARC_I2C_ADDRESS);
+REGISTER_I2C_PCI_DETECTOR("ONIX LUMI Intel Arc B580",
+                          DetectOnixArcGPUControllers,
+                          INTEL_VEN,     INTEL_ARC_B580_DEV,
+                          ONIX_SUB_VEN,  ONIX_LUMI_ARC_B580,
+                          ONIX_ARC_I2C_ADDRESS);

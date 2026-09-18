@@ -156,3 +156,42 @@ characterised.
 - **Direct entered from an animated mode**: switches into Custom correctly and stops the
   animation. The gap I suspected did not exist.
 - **`tools/lumi-led.py` after being changed**: Rainbow animates.
+
+## Second audit: code quality
+
+A pass looking for duplication, dead code and drift between the two implementations.
+
+**The register maps agree.** All 21 registers and all 7 mode values match between
+`tools/lumi-led.py` and the C++ header. The duplication is inherent to having two
+implementations in two languages; `docs/05-led-protocol.md` is the single source of truth
+if they ever diverge.
+
+**The driver never declared the strip length.** `ONIX_REG_STRIP_LENGTH` was defined and
+never written: the driver trusted whatever state the card was in. That is not theoretical
+— the experiments in this document left `0x27` at 4 and then 7. The driver now writes it
+on detection, and the fix was verified by deliberately setting the strip to 4 LEDs,
+confirming Block Stacking filled in 4 steps, then letting OpenRGB detect the card and
+watching it fill all 14 again.
+
+It still does not write brightness or bypass, which the vendor tool also sets at startup.
+Brightness would override the user's last choice, and bypass is a user preference.
+
+**Half of `amc.py` was dead, and the dead half was the dangerous half.** Ten of sixteen
+`I2CBus` methods were never called. Several of them — `read_byte_data`, `read_word_data`,
+`write_byte_data` and the block variants — write a single byte and then read, which is
+exactly the half-finished transaction documented in `docs/03-pitfalls.md` as what wedges
+this device. The same class of hazard that had already been removed with `amc-probe.py`
+was sitting in the library every tool imports.
+
+With them went the whole SMBus layer that existed only to serve them: `_smbus`, the
+`i2c_smbus_*` structures and around ten constants. The module went from 237 lines to 112,
+and what remains is what is actually used: locate the device, raw write, raw read.
+
+**Smaller removals:** `SetDirection()` in the driver (register `0x14` is not exposed as an
+OpenRGB control), `blob()` in the metadata reader, `VENDOR_ONIX` and `CTRL_CMDS` in the
+MCTP tool. `main()` in `lumi-led.py` was 103 lines building transactions inline; the
+building moved to `build_transactions()` and `main()` is now 62.
+
+Re-running the audit afterwards found no remaining unused method or constant in either
+implementation. Every tool was re-tested, and the card was exercised through static
+colour, rainbow, breathing and stacking with no regression.

@@ -106,7 +106,9 @@ RGBController_OnixArc::RGBController_OnixArc(OnixArcController* controller_ptr)
     mode Breathing;
     Breathing.name              = "Breathing";
     Breathing.value             = ONIX_RGBCONTROLLER_MODE_BREATHING;
-    Breathing.flags             = MODE_FLAG_HAS_MODE_SPECIFIC_COLOR | MODE_FLAG_HAS_SPEED | MODE_FLAG_HAS_BRIGHTNESS;
+    Breathing.flags             = MODE_FLAG_HAS_MODE_SPECIFIC_COLOR
+                                | MODE_FLAG_HAS_SPEED
+                                | MODE_FLAG_HAS_BRIGHTNESS;
     Breathing.color_mode        = MODE_COLORS_MODE_SPECIFIC;
     Breathing.colors_min        = 1;
     Breathing.colors_max        = 1;

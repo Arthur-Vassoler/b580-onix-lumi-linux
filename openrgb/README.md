@@ -89,6 +89,18 @@ rather than 14 that always match.
 registers — measured at 20 Hz with no I²C errors. The driver avoids touching the mode
 register on that path, otherwise the effect restarts on every frame.
 
+## On detection
+
+The driver writes the strip length (`0x27 = 0x0E`, 14 LEDs) as soon as the card is
+detected. The register is what tells the firmware how many LEDs the effects span, and it
+persists: a card left declaring a shorter strip would run every effect over part of it,
+with nothing in OpenRGB to put it right.
+
+It deliberately does **not** write the other two registers the vendor tool sets at startup.
+Brightness would override whatever the user last chose, and bypass hands the strip to the
+motherboard's ARGB header — a user preference this driver has no business flipping on
+detection.
+
 ## Two hardware constraints, encoded in the driver
 
 1. **Never batch a mode change with other registers in one transaction.** The card accepts

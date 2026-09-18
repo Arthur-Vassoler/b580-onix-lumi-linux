@@ -19,7 +19,9 @@
 \*---------------------------------------------------------*/
 #define ONIX_TRANSACTION_DELAY_MS   50
 
-OnixArcController::OnixArcController(i2c_smbus_interface* bus, unsigned char address, const std::string& name)
+OnixArcController::OnixArcController(i2c_smbus_interface* bus,
+                                     unsigned char address,
+                                     const std::string& name)
 {
     this->bus   = bus;
     this->dev   = address;
@@ -68,6 +70,13 @@ void OnixArcController::WritePairs(const unsigned char* pairs, unsigned int leng
     std::this_thread::sleep_for(std::chrono::milliseconds(ONIX_TRANSACTION_DELAY_MS));
 }
 
+void OnixArcController::Initialize()
+{
+    unsigned char pairs[2] = { ONIX_REG_STRIP_LENGTH, ONIX_STRIP_LENGTH };
+
+    WritePairs(pairs, 2);
+}
+
 void OnixArcController::SetMode(unsigned char mode)
 {
     unsigned char pairs[2] = { ONIX_REG_MODE, mode };
@@ -82,14 +91,9 @@ void OnixArcController::SetBrightness(unsigned char brightness)
     WritePairs(pairs, 2);
 }
 
-void OnixArcController::SetDirection(unsigned char direction)
-{
-    unsigned char pairs[2] = { ONIX_REG_DIRECTION, direction };
-
-    WritePairs(pairs, 2);
-}
-
-void OnixArcController::SetCustomColor(unsigned char red, unsigned char green, unsigned char blue)
+void OnixArcController::SetCustomColor(unsigned char red,
+                                       unsigned char green,
+                                       unsigned char blue)
 {
     unsigned char pairs[6] =
     {
@@ -101,7 +105,9 @@ void OnixArcController::SetCustomColor(unsigned char red, unsigned char green, u
     WritePairs(pairs, 6);
 }
 
-void OnixArcController::SetBreathingColor(unsigned char red, unsigned char green, unsigned char blue)
+void OnixArcController::SetBreathingColor(unsigned char red,
+                                          unsigned char green,
+                                          unsigned char blue)
 {
     unsigned char pairs[6] =
     {
